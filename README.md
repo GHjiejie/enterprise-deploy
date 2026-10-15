@@ -129,3 +129,7 @@ npm run release:deploy -- \
 - 已打开的旧页面需要服务端限制与刷新策略配合；本地部署保留旧资源且 HTML 重新验证，避免新旧资源混用。
 
 实现依据为用户提供的 [架构原文](docs/architecture.md)。构建常量和环境机制遵循 [Vite define](https://vite.dev/config/shared-options#define) 与 [Env Variables and Modes](https://vite.dev/guide/env-and-mode)。
+
+## 本地风险记录
+
+[2026 年 10 月 15 日本地风险评估](docs/local-risk-assessment-2026-10-15.md) 记录了 `qianshi` 产物中禁用模块代码仍被交付、修改前端副本可恢复隐藏界面，以及共享代码和物理裁剪验收的缺口。报告包含产物身份、文件证据、受控浏览器对照、整改建议和验收要求；恢复界面不代表已验证真实 API 越权。
