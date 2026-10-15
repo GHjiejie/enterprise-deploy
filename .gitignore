@@ -1,0 +1,11 @@
+node_modules/
+dist/
+releases/
+deployments/
+playwright-report/
+test-results/
+coverage/
+.env.local
+.env.*.local
+.DS_Store
+.console-build.lock

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+releases/
+deployments/
+playwright-report/
+test-results/
+coverage/
+docs/architecture.md
+.console-build.lock
+.vscode/

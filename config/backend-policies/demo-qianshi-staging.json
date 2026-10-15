@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "demo-v1",
+  "profileId": "qianshi",
+  "environment": "staging",
+  "contractVersion": "demo-contract-v1",
+  "capabilities": []
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "demo-v1",
+  "profileId": "enterprise-b",
+  "environment": "production",
+  "contractVersion": "demo-contract-v1",
+  "capabilities": []
+}

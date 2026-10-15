@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "qianshi",
+  "modules": {
+    "modelCatalog": false,
+    "chat": false,
+    "imageStudio": false,
+    "videoStudio": true
+  },
+  "defaultModule": "videoStudio"
+}

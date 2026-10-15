@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "enterprise-b",
+  "modules": {
+    "modelCatalog": true,
+    "chat": true,
+    "imageStudio": true,
+    "videoStudio": true
+  },
+  "defaultModule": "modelCatalog"
+}

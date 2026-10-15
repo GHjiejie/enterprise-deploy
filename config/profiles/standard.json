@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "standard",
+  "modules": {
+    "modelCatalog": true,
+    "chat": true,
+    "imageStudio": true,
+    "videoStudio": true
+  },
+  "defaultModule": "modelCatalog"
+}
