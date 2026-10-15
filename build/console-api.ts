@@ -1,7 +1,6 @@
-import { createReadStream, lstatSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ConsoleApiError, ConsoleBootstrap } from '../shared/build-console.ts';
-import { getEntryRoute, moduleRegistry } from '../src/app/module-registry.ts';
+import { getEntryRoute, moduleRegistry } from './module-catalog.ts';
 import type { ConsoleJobManager } from './console-jobs.ts';
 import { ConsoleError, type ConsoleProfileStore, validateConsoleProfile } from './console-store.ts';
 
@@ -168,7 +167,7 @@ export async function handleConsoleRequest(
       );
       return true;
     }
-    const buildMatch = /^\/api\/builds\/([^/]+)(?:\/(package))?$/u.exec(path);
+    const buildMatch = /^\/api\/builds\/([^/]+)(?:\/(package|pruning-report))?$/u.exec(path);
     if (buildMatch) {
       if (request.method !== 'GET') throw new ConsoleError(405, '此接口仅支持 GET');
       const id = decodePathId(buildMatch[1]!);
@@ -178,20 +177,17 @@ export async function handleConsoleRequest(
         sendJson(response, 200, job);
         return true;
       }
-      const artifact = dependencies.jobs.getArtifact(id);
-      if (!artifact || !job.result) throw new ConsoleError(409, '此任务尚无可下载制品');
-      const stat = lstatSync(artifact.packagePath);
-      if (!stat.isFile() || stat.isSymbolicLink()) throw new ConsoleError(500, '制品文件无效');
+      const report = buildMatch[2] === 'pruning-report';
+      const bytes = report ? dependencies.jobs.readReport(id) : dependencies.jobs.readPackage(id);
+      if (!bytes || !job.result) throw new ConsoleError(409, '此任务尚无可下载制品');
       response.writeHead(200, {
-        'Content-Type': 'application/gzip',
-        'Content-Length': stat.size,
-        'Content-Disposition': `attachment; filename="${job.result.packageName}"`,
+        'Content-Type': report ? 'application/json; charset=utf-8' : 'application/gzip',
+        'Content-Length': bytes.length,
+        'Content-Disposition': `attachment; filename="${report ? 'pruning-report.json' : job.result.packageName}"`,
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       });
-      const stream = createReadStream(artifact.packagePath);
-      stream.once('error', () => response.destroy());
-      stream.pipe(response);
+      response.end(bytes);
       return true;
     }
     throw new ConsoleError(404, '接口不存在');

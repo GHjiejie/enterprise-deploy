@@ -11,6 +11,8 @@ import {
   type ConsoleJobManager,
 } from '../../build/console-jobs.ts';
 import { createConsoleProfileStore } from '../../build/console-store.ts';
+import { writeReleaseRecord } from '../../build/release-record.ts';
+import { writeFixturePruningReport } from '../helpers/pruned-artifact.ts';
 
 const roots: string[] = [];
 const servers: Server[] = [];
@@ -114,6 +116,48 @@ afterEach(async () => {
 });
 
 describe('local build console API', () => {
+  it('downloads the verified pruning report and package, refusing changes before a later download', async () => {
+    const { request, jobs, store } = await fixture(async (run) => {
+      const outDir = join(run.rootDir, 'dist', run.profile.id, run.mode);
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(join(outDir, 'index.html'), '<html>verified fixture</html>');
+      writeReleaseRecord({
+        outDir,
+        profile: run.profile,
+        mode: run.mode,
+        buildId: run.jobId,
+        pruning: writeFixturePruningReport(outDir, run.profile, run.mode, run.jobId),
+        backendCompatibility: {
+          policyVersion: 'v1',
+          contractVersion: 'v1',
+          requiredCapabilities: [],
+        },
+      });
+      return 0;
+    });
+    const started = await request('/api/builds', {
+      method: 'POST',
+      body: { profile: profile(), expectedRevision: store.list()[0]!.revision, mode: 'production' },
+    });
+    const id = (started.json as { job: { id: string } }).job.id;
+    await expect.poll(() => jobs.get(id)?.status).toBe('succeeded');
+    const report = await request(`/api/builds/${id}/pruning-report`);
+    expect(report.status).toBe(200);
+    expect(report.json).toMatchObject({
+      buildId: id,
+      enabledModules: ['modelCatalog', 'chat'],
+      excludedModules: ['imageStudio', 'videoStudio'],
+    });
+    expect(report.headers['content-disposition']).toContain('pruning-report.json');
+    const downloaded = await request(`/api/builds/${id}/package`);
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.headers['content-type']).toBe('application/gzip');
+    const artifact = jobs.getArtifact(id)!;
+    writeFileSync(join(artifact.siteDirectory, 'index.html'), 'tampered');
+    expect((await request(`/api/builds/${id}/package`)).status).toBe(500);
+    expect((await request(`/api/builds/${id}/pruning-report`)).status).toBe(500);
+  });
+
   it('returns dynamic profile/module metadata and saves a newly named enterprise', async () => {
     const { request } = await fixture();
     const bootstrap = await request('/api/bootstrap');

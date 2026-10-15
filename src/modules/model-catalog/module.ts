@@ -2,6 +2,7 @@ import type { ModuleDefinition } from '../../../shared/module-definition.ts';
 
 export const modelCatalogModule = {
   id: 'modelCatalog',
+  display: { title: '模型广场', icon: '◈' },
   entryRouteName: 'modelCatalog.index',
   viewPermission: 'modelCatalog.view',
   dependsOn: [],

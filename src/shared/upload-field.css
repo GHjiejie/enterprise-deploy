@@ -1,0 +1,21 @@
+.upload-field {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.upload-field input {
+  font-size: 12px;
+}
+.file-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  overflow-wrap: anywhere;
+}
+.file-preview img {
+  width: 90px;
+  height: 75px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}

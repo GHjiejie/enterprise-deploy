@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createConsolePreview, type ConsolePreview } from '../../build/console-preview.ts';
 import { writeReleaseRecord } from '../../build/release-record.ts';
 import type { BuildProfile } from '../../shared/build-profile.ts';
+import { writeFixturePruningReport } from '../helpers/pruned-artifact.ts';
 
 const directories: string[] = [];
 const servers: ConsolePreview[] = [];
@@ -29,6 +30,8 @@ function artifact() {
     outDir: directory,
     profile,
     mode: 'production',
+    buildId: 'preview-fixture',
+    pruning: writeFixturePruningReport(directory, profile, 'production', 'preview-fixture'),
     backendCompatibility: {
       policyVersion: 'demo-v1',
       contractVersion: 'demo-contract-v1',
@@ -86,5 +89,17 @@ describe('isolated build result preview', () => {
     const directory = artifact();
     writeFileSync(join(directory, 'assets/main-12345678.js'), 'tampered');
     await expect(createConsolePreview(directory)).rejects.toThrow('完整性');
+  });
+
+  it('revalidates each request and refuses snapshots changed after server startup', async () => {
+    const directory = artifact();
+    const server = await createConsolePreview(directory);
+    servers.push(server);
+    expect((await fetch(`${server.origin}/assets/main-12345678.js`)).status).toBe(200);
+    writeFileSync(join(directory, 'assets/main-12345678.js'), 'tampered later');
+    expect((await fetch(`${server.origin}/assets/main-12345678.js`)).status).toBe(409);
+    expect((await fetch(`${server.origin}/`, { headers: { Accept: 'text/html' } })).status).toBe(
+      409,
+    );
   });
 });

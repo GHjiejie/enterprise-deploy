@@ -2,6 +2,7 @@ import type { ModuleDefinition } from '../../../shared/module-definition.ts';
 
 export const videoStudioModule = {
   id: 'videoStudio',
+  display: { title: '视频生成', icon: '▷' },
   entryRouteName: 'videoStudio.index',
   viewPermission: 'videoStudio.view',
   dependsOn: [],

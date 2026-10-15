@@ -9,6 +9,10 @@ export interface ModuleRoute {
 
 export interface ModuleDefinition {
   readonly id: ModuleId;
+  readonly display: {
+    readonly title: string;
+    readonly icon: string;
+  };
   readonly routes: readonly ModuleRoute[];
   readonly entryRouteName: string;
   readonly viewPermission: string;

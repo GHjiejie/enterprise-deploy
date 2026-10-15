@@ -1,9 +1,11 @@
+import './styles.css';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAccess } from '../../app/page-context.tsx';
 import { buildProfile } from '../../platform/features.ts';
 import { resolveModuleLink } from '../../platform/navigation-service.ts';
-import { catalogModels, moduleLabels } from '../../shared/model-data.ts';
+import { catalogModels } from './model-data.ts';
+import { activeRegistry } from '../../app/active-modules.ts';
 import { ModuleLink } from '../../shared/module-link.tsx';
 import type { ModuleId } from '../../../shared/build-profile.ts';
 
@@ -22,7 +24,7 @@ export default function ModelCatalogPage() {
     `${model.name} ${model.description} ${model.tags.join(' ')}`.includes(query.trim()),
   );
   const entryResults = results.flatMap((model) => {
-    const link = resolveModuleLink(model.moduleId, buildProfile, access);
+    const link = resolveModuleLink(model.moduleId, buildProfile, access, activeRegistry);
     return link.available ? [{ model, href: link.href }] : [];
   });
 
@@ -99,7 +101,9 @@ export default function ModelCatalogPage() {
           {entryResults.length ? (
             entryResults.map(({ model, href }) => (
               <Link key={model.id} to={href}>
-                {moduleLabels[model.moduleId]} →
+                {activeRegistry.find((module) => module.id === model.moduleId)?.display.title ??
+                  model.name}{' '}
+                →
               </Link>
             ))
           ) : (
@@ -120,7 +124,7 @@ export default function ModelCatalogPage() {
             key={item.moduleId}
             type="button"
             onClick={() => {
-              const link = resolveModuleLink(item.moduleId, buildProfile, access);
+              const link = resolveModuleLink(item.moduleId, buildProfile, access, activeRegistry);
               if (!link.available) {
                 setNotice(link.message);
                 return;
@@ -131,7 +135,9 @@ export default function ModelCatalogPage() {
           >
             <span>{item.title}</span>
             <span className="muted">
-              {moduleLabels[item.moduleId]} <span aria-hidden="true">↗</span>
+              {activeRegistry.find((module) => module.id === item.moduleId)?.display.title ??
+                '体验入口'}{' '}
+              <span aria-hidden="true">↗</span>
             </span>
           </button>
         ))}

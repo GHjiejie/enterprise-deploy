@@ -1,6 +1,6 @@
 import type { BuildProfile, ModuleId } from '../../shared/build-profile.ts';
 import type { ModuleDefinition } from '../../shared/module-definition.ts';
-import { getEntryRoute, moduleRegistry } from '../app/module-registry.ts';
+import { getEntryRoute } from '../../shared/module-assembly.ts';
 import { canViewModule, type UserAccess } from './permissions.ts';
 
 export type ModuleLinkResolution =
@@ -16,7 +16,7 @@ export function resolveModuleLink(
   moduleId: ModuleId,
   profile: BuildProfile,
   access: UserAccess,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): ModuleLinkResolution {
   if (profile.modules[moduleId] !== true) {
     return { available: false, reason: 'disabled', message: '当前企业版本未开放此体验模块。' };
@@ -42,7 +42,7 @@ export function getModuleHref(
   moduleId: ModuleId,
   profile: BuildProfile,
   access: UserAccess,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): string | null {
   const link = resolveModuleLink(moduleId, profile, access, registry);
   return link.available ? link.href : null;
@@ -52,6 +52,7 @@ export function filterModuleLinks<T extends { readonly moduleId: ModuleId }>(
   items: readonly T[],
   profile: BuildProfile,
   access: UserAccess,
+  registry: readonly ModuleDefinition[],
 ): T[] {
-  return items.filter((item) => getModuleHref(item.moduleId, profile, access) !== null);
+  return items.filter((item) => getModuleHref(item.moduleId, profile, access, registry) !== null);
 }

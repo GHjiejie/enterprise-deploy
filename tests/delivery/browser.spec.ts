@@ -2,14 +2,22 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadBuildProfile } from '../../build/load-profile.ts';
-import { parseBuildMode } from '../../shared/build-profile.ts';
+import { MODULE_IDS, parseBuildMode } from '../../shared/build-profile.ts';
 import { validateTarget, parseBackendPolicy } from '../../build/release-record.ts';
+import { parseDeliveryPolicy } from '../../build/delivery-policy.ts';
+import { moduleRegistry } from '../../build/module-catalog.ts';
 import { getModuleHref } from '../../src/platform/navigation-service.ts';
 import { DEMO_ACCESS } from '../../src/platform/permissions.ts';
+import { startTamperedPreview } from './tamper-preview.ts';
 
 const profile = loadBuildProfile(process.env.APP_PROFILE);
 const mode = parseBuildMode(process.env.APP_MODE ?? 'production');
-const defaultHref = getModuleHref(profile.defaultModule, profile, DEMO_ACCESS.member);
+const defaultHref = getModuleHref(
+  profile.defaultModule,
+  profile,
+  DEMO_ACCESS.member,
+  moduleRegistry,
+);
 const previewOrigin = `http://127.0.0.1:${process.env.DELIVERY_PORT ?? 4173}`;
 const backendPolicy = parseBackendPolicy(
   JSON.parse(
@@ -20,6 +28,39 @@ const record = validateTarget(resolve(`dist/${profile.id}/${mode}`), {
   profileId: profile.id,
   environment: mode,
   backendPolicy,
+  deliveryPolicy: parseDeliveryPolicy(
+    JSON.parse(
+      readFileSync(resolve(`config/delivery-policies/demo-${profile.id}-${mode}.json`), 'utf8'),
+    ),
+  ),
+});
+
+test('隔离产物副本改开关也不能恢复未交付模块', async ({ page }) => {
+  const disabled = MODULE_IDS.filter((id) => !profile.modules[id]);
+  test.skip(disabled.length === 0, '全模块包没有被裁剪模块');
+  const preview = await startTamperedPreview(
+    resolve(`dist/${profile.id}/${mode}`),
+    record,
+    disabled,
+  );
+  try {
+    for (const id of disabled) {
+      const definition = moduleRegistry.find((module) => module.id === id);
+      const path = definition?.routes.find(
+        (route) => route.name === definition.entryRouteName,
+      )?.path;
+      if (!path) throw new Error(`Missing test route for ${id}`);
+      await page.goto(`${preview.origin}${path}`);
+      await expect(page.getByTestId('route-not-found')).toBeVisible();
+    }
+    await page.goto(`${preview.origin}${defaultHref}`);
+    await expect(page.getByTestId('route-not-found')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link')).toHaveCount(
+      record.enabledModules.length,
+    );
+  } finally {
+    await preview.close();
+  }
 });
 
 test('产物身份、配置仓库隔离和默认入口', async ({ page, request }) => {

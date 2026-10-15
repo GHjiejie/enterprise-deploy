@@ -1,7 +1,7 @@
 import { generatePath, matchPath } from 'react-router-dom';
 import type { BuildProfile, ModuleId } from '../../shared/build-profile.ts';
 import type { ModuleDefinition } from '../../shared/module-definition.ts';
-import { getEnabledModules, moduleRegistry } from './module-registry.ts';
+import { getEnabledModules } from '../../shared/module-assembly.ts';
 import { getModuleHref } from '../platform/navigation-service.ts';
 import { canViewModule, type UserAccess } from '../platform/permissions.ts';
 
@@ -38,7 +38,7 @@ export function resolveAppRoute(
   path: string,
   profile: BuildProfile,
   access: UserAccess,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): RouteResolution {
   const pathname = path.split(/[?#]/, 1)[0] ?? '';
   if (!pathname.startsWith('/') || pathname.startsWith('//')) return { kind: 'not-found' };

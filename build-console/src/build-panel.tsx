@@ -1,4 +1,23 @@
-import type { BuildJob, ConsoleModule, ReleaseMode } from '../../shared/build-console.ts';
+import type {
+  BuildJob,
+  BuildStage,
+  ConsoleModule,
+  ReleaseMode,
+} from '../../shared/build-console.ts';
+
+const stageLabels: Readonly<Record<BuildStage, string>> = {
+  queued: '等待构建',
+  building: '运行构建与校验',
+  validating: '校验企业配置',
+  compiling: '构建企业模块',
+  pruning: '检查模块与资源裁剪',
+  verifying: '复验构建产物',
+  snapshotting: '生成并复验固定快照',
+  packaging: '生成交付包',
+  'package-verifying': '安全解包并复验交付包',
+  complete: '全部校验通过',
+  failed: '构建已停止',
+};
 
 export const modeLabels: Readonly<Record<ReleaseMode, string>> = {
   staging: '预发布环境',
@@ -65,7 +84,7 @@ export function BuildPanel({ job, modules, pollError }: BuildPanelProps) {
         </span>
         <div>
           <strong>{status.label}</strong>
-          <p>{status.hint}</p>
+          <p>{isJobActive(job) ? stageLabels[job.stage] : status.hint}</p>
         </div>
       </div>
       <div className="job-context">
@@ -96,6 +115,19 @@ export function BuildPanel({ job, modules, pollError }: BuildPanelProps) {
                 <code>{job.result.outDir}</code>
               </dd>
             </div>
+            <div>
+              <dt>物理裁剪</dt>
+              <dd data-testid="pruning-status">校验通过 · {job.result.pruning.checkerVersion}</dd>
+            </div>
+            <div>
+              <dt>排除模块</dt>
+              <dd>
+                {modules
+                  .filter((module) => job.result?.pruning.excludedModules.includes(module.id))
+                  .map((module) => module.label)
+                  .join('、') || '无'}
+              </dd>
+            </div>
           </dl>
           <div className="result-actions">
             <a
@@ -108,6 +140,9 @@ export function BuildPanel({ job, modules, pollError }: BuildPanelProps) {
             </a>
             <a className="button secondary" href={job.result.downloadUrl}>
               下载交付包 <span aria-hidden="true">↓</span>
+            </a>
+            <a className="button secondary" href={job.result.pruning.reportDownloadUrl}>
+              下载裁剪报告 <span aria-hidden="true">↓</span>
             </a>
           </div>
           <p className="package-name">{job.result.packageName}</p>

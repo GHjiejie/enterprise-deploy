@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { parseDeliveryPolicy } from './delivery-policy.ts';
 import {
   canonicalJson,
   environment,
@@ -172,36 +173,128 @@ function archiveUnlocked(
   return { path, record };
 }
 
-function preserveAssets(source: string, root: string, record: ReleaseRecord): void {
-  const assets = managedDirectory(root, 'assets');
-  for (const file of record.artifacts.filter((item) => item.path.startsWith('assets/'))) {
-    if (!/-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+$/u.test(basename(file.path)))
-      throw new Error(`Immutable assets must use fingerprinted filenames: ${file.path}`);
-    const relativePath = file.path.slice('assets/'.length);
-    const destination = join(assets, relativePath);
-    // Create and inspect every component so an unexpected symlink cannot redirect writes.
-    let directory = assets;
-    for (const segment of relativePath.split('/').slice(0, -1))
-      directory = managedDirectory(directory, segment);
-    if (existsSync(destination)) {
-      const stat = lstatSync(destination);
+function assertCurrentEntry(root: string): void {
+  try {
+    const stat = lstatSync(join(root, 'current'));
+    // Accept the original adapter's relative pointer for a one-way V2 migration.
+    if (
+      !stat.isSymbolicLink() ||
+      !/^(?:releases|public-generations)\/[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u.test(
+        readlinkSync(join(root, 'current')),
+      )
+    )
+      throw new Error('Refusing to replace an unexpected current entry');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+}
+
+interface PublicAsset {
+  path: string;
+  bytes: number;
+  sha256: string;
+  sourceBuildIds: string[];
+}
+
+/** Build a fresh resource set under the current policy; old on-disk evidence stays private. */
+function preparePublicGeneration(
+  release: string,
+  root: string,
+  record: ReleaseRecord,
+  target: ReleaseTarget,
+): string {
+  const generations = managedDirectory(root, 'public-generations');
+  const generationId = randomUUID();
+  const temporary = join(generations, `.tmp-${generationId}`);
+  const destination = join(generations, generationId);
+  mkdirSync(temporary);
+  try {
+    const site = managedDirectory(temporary, 'site');
+    for (const path of record.directories) mkdirSync(join(site, path), { recursive: true });
+    for (const file of record.artifacts)
+      copyFileSync(join(release, file.path), join(site, file.path), constants.COPYFILE_EXCL);
+    copyFileSync(
+      join(release, RELEASE_RECORD_FILE),
+      join(site, RELEASE_RECORD_FILE),
+      constants.COPYFILE_EXCL,
+    );
+    if (!sameRelease(validateTarget(site, target), record))
+      throw new Error('Public site changed while being copied');
+    const assets = managedDirectory(temporary, 'assets');
+    const retained = new Map<string, PublicAsset>();
+    const eligibleBuildIds: string[] = [];
+    const excludedBuildIds: string[] = [];
+    const archives = managedDirectory(root, 'archives');
+    for (const buildId of readdirSync(archives).sort()) {
+      if (buildId.startsWith('.tmp-')) continue;
+      safeIdentifier(buildId, 'Archived buildId');
+      const source = join(archives, buildId);
+      regularDirectory(source);
+      let historical: ReleaseRecord;
+      try {
+        historical = validateTarget(source, target);
+      } catch {
+        // Invalid, legacy, or now-disallowed releases are never copied into a public generation.
+        excludedBuildIds.push(buildId);
+        continue;
+      }
+      if (historical.buildId !== buildId)
+        throw new Error('Archive identifier does not match release record');
+      eligibleBuildIds.push(buildId);
+      for (const file of historical.artifacts.filter((item) => item.path.startsWith('assets/'))) {
+        if (!/-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+$/u.test(basename(file.path)))
+          throw new Error(`Immutable assets must use fingerprinted filenames: ${file.path}`);
+        const previous = retained.get(file.path);
+        if (previous) {
+          if (previous.sha256 !== file.sha256 || previous.bytes !== file.bytes)
+            throw new Error(`Retained asset name collision or tampering: ${file.path}`);
+          previous.sourceBuildIds.push(buildId);
+          continue;
+        }
+        const relativePath = file.path.slice('assets/'.length);
+        let directory = assets;
+        for (const segment of relativePath.split('/').slice(0, -1))
+          directory = managedDirectory(directory, segment);
+        const assetDestination = join(assets, relativePath);
+        copyFileSync(join(source, file.path), assetDestination, constants.COPYFILE_EXCL);
+        if (sha256(readFileSync(assetDestination)) !== file.sha256)
+          throw new Error('Asset changed while being retained');
+        retained.set(file.path, { ...file, sourceBuildIds: [buildId] });
+      }
+    }
+    if (!eligibleBuildIds.includes(record.buildId))
+      throw new Error('Active release lost eligibility while preparing public assets');
+    const inventory = {
+      schemaVersion: 1,
+      profileId: target.profileId,
+      environment: environment(target.environment),
+      activeBuildId: record.buildId,
+      deliveryPolicyDigest: sha256(canonicalJson(parseDeliveryPolicy(target.deliveryPolicy))),
+      eligibleBuildIds,
+      excludedBuildIds,
+      assets: [...retained.values()].sort((a, b) => a.path.localeCompare(b.path)),
+    };
+    writeFileSync(
+      join(temporary, '.public-inventory.json'),
+      `${JSON.stringify(inventory, null, 2)}\n`,
+      { flag: 'wx' },
+    );
+    // Every retained byte is checked immediately before publishing the immutable generation.
+    for (const file of retained.values()) {
+      const path = join(temporary, file.path);
+      const stat = lstatSync(path);
       if (
         !stat.isFile() ||
         stat.isSymbolicLink() ||
-        sha256(readFileSync(destination)) !== file.sha256
+        stat.size !== file.bytes ||
+        sha256(readFileSync(path)) !== file.sha256
       )
-        throw new Error(`Retained asset name collision or tampering: ${file.path}`);
-    } else {
-      const temporary = join(dirname(destination), `.tmp-${randomUUID()}`);
-      try {
-        copyFileSync(join(source, file.path), temporary, constants.COPYFILE_EXCL);
-        if (sha256(readFileSync(temporary)) !== file.sha256)
-          throw new Error('Asset changed while being retained');
-        renameSync(temporary, destination);
-      } finally {
-        if (existsSync(temporary)) rmSync(temporary);
-      }
+        throw new Error('Public resource integrity check failed');
     }
+    renameSync(temporary, destination);
+    return destination;
+  } finally {
+    if (existsSync(temporary)) rmSync(temporary, { recursive: true });
   }
 }
 
@@ -211,22 +304,13 @@ function activateArchived(
   record: ReleaseRecord,
   target: ReleaseTarget,
 ): string {
+  assertCurrentEntry(root);
   const release = copyVerifiedRelease(source, managedDirectory(root, 'releases'), record, target);
-  preserveAssets(release, root, record);
+  const generation = preparePublicGeneration(release, root, record, target);
   const current = join(root, 'current');
-  try {
-    const stat = lstatSync(current);
-    if (
-      !stat.isSymbolicLink() ||
-      !/^releases\/[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u.test(readlinkSync(current))
-    )
-      throw new Error('Refusing to replace an unexpected current entry');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
   const temporary = join(root, `.current-${randomUUID()}`);
   try {
-    symlinkSync(`releases/${record.buildId}`, temporary, 'dir');
+    symlinkSync(`public-generations/${basename(generation)}`, temporary, 'dir');
     renameSync(temporary, current);
   } finally {
     try {
@@ -285,6 +369,7 @@ function argumentsFor(command: string, args: string[]): Map<string, string> {
     '--profile',
     '--mode',
     '--backend-policy',
+    '--delivery-policy',
     ...(command === 'verify'
       ? ['--artifact']
       : command === 'rollback'
@@ -308,7 +393,7 @@ export function runReleaseCli(args: string[]): void {
   const command = args[0];
   if (!command || !['verify', 'archive', 'deploy', 'rollback'].includes(command))
     throw new Error(
-      'Usage: release-cli.ts <verify|archive|deploy|rollback> --profile ID --mode ENV --backend-policy FILE [--artifact DIR] [--target DIR] [--release BUILD_ID]',
+      'Usage: release-cli.ts <verify|archive|deploy|rollback> --profile ID --mode ENV --backend-policy FILE --delivery-policy FILE [--artifact DIR] [--target DIR] [--release BUILD_ID]',
     );
   const options = argumentsFor(command, args.slice(1));
   const profileId = options.get('--profile')!;
@@ -316,6 +401,9 @@ export function runReleaseCli(args: string[]): void {
   const target: ReleaseTarget = {
     profileId,
     environment: environment(options.get('--mode')),
+    deliveryPolicy: parseDeliveryPolicy(
+      JSON.parse(readFileSync(resolve(options.get('--delivery-policy')!), 'utf8')),
+    ),
     backendPolicy: parseBackendPolicy(
       JSON.parse(readFileSync(resolve(options.get('--backend-policy')!), 'utf8')),
     ),

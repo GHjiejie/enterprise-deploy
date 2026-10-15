@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "profileId": "standard",
+  "environment": "production",
+  "allowedModules": ["modelCatalog", "chat", "imageStudio", "videoStudio"],
+  "minReleaseSchemaVersion": 2,
+  "allowedPruningRules": [
+    {
+      "checkerVersion": "1.0.0",
+      "ownershipPolicyVersion": 1,
+      "ownershipPolicyDigest": "14f5b09b9dfd555009ae2824c64076b5a616c1933fdb1902b5337bab15c94bb9"
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 
 import { join, resolve } from 'node:path';
 import { MODULE_IDS, type BuildProfile, type ModuleId } from '../shared/build-profile.ts';
 import { parseBuildProfile } from './load-profile.ts';
+import { parseDeliveryPolicy, type DeliveryPolicy } from './delivery-policy.ts';
+import { parsePruningReference, verifyPruningArtifact, type PruningReference } from './pruning.ts';
 
 export const RELEASE_RECORD_FILE = 'release-record.json';
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
@@ -30,8 +32,7 @@ export interface ArtifactFile {
   sha256: string;
 }
 
-export interface ReleaseRecord {
-  schemaVersion: 1;
+interface ReleaseRecordBase {
   profileId: string;
   environment: Environment;
   appVersion: string;
@@ -51,6 +52,17 @@ export interface ReleaseRecord {
   artifactDigest: string;
 }
 
+export interface LegacyReleaseRecord extends ReleaseRecordBase {
+  schemaVersion: 1;
+}
+
+export interface ReleaseRecordV2 extends ReleaseRecordBase {
+  schemaVersion: 2;
+  pruning: PruningReference;
+}
+
+export type ReleaseRecord = LegacyReleaseRecord | ReleaseRecordV2;
+
 export interface ReleaseRecordOptions {
   outDir: string;
   profile: BuildProfile;
@@ -60,12 +72,16 @@ export interface ReleaseRecordOptions {
   buildId?: string;
   gitCommit?: string;
   backendCompatibility: BackendCompatibility;
+  pruning?: PruningReference;
+  /** Historical inspection/test helpers only; never eligible for new delivery. */
+  legacy?: true;
 }
 
 export interface ReleaseTarget {
   profileId: string;
   environment: string;
   backendPolicy: BackendPolicy;
+  deliveryPolicy: DeliveryPolicy;
 }
 
 export function canonicalJson(value: unknown): string {
@@ -287,6 +303,12 @@ function sourceState(root: string): ReleaseRecord['sourceState'] {
 }
 
 export function createReleaseRecord(options: ReleaseRecordOptions): ReleaseRecord {
+  if (!options.pruning && !options.legacy)
+    throw new Error(
+      'New release records require verified pruning; legacy creation must be explicit',
+    );
+  if (options.pruning && options.legacy)
+    throw new Error('A release cannot be both legacy and physically pruned');
   const root = resolve(options.rootDir ?? process.cwd());
   const profile = parseBuildProfile(options.profile, options.profile.id);
   const mode = environment(options.mode);
@@ -306,8 +328,9 @@ export function createReleaseRecord(options: ReleaseRecordOptions): ReleaseRecor
   const buildId = options.buildId ?? randomUUID();
   safeIdentifier(buildId, 'buildId');
   const files = scanArtifacts(options.outDir);
-  const record: ReleaseRecord = {
-    schemaVersion: 1,
+  const record = {
+    schemaVersion: options.pruning ? 2 : 1,
+    ...(options.pruning ? { pruning: options.pruning } : {}),
     profileId: profile.id,
     environment: mode,
     appVersion: manifest.version,
@@ -332,7 +355,9 @@ export function createReleaseRecord(options: ReleaseRecordOptions): ReleaseRecor
     ...files,
     artifactDigest: sha256(canonicalJson(files)),
   };
-  return parseReleaseRecord(record);
+  const parsed = parseReleaseRecord(record);
+  if (parsed.schemaVersion === 2) verifyPruningArtifact(options.outDir, parsed);
+  return parsed;
 }
 
 export function writeReleaseRecord(options: ReleaseRecordOptions): ReleaseRecord {
@@ -364,10 +389,15 @@ export function parseReleaseRecord(value: unknown): ReleaseRecord {
       'directories',
       'artifacts',
       'artifactDigest',
+      ...(data.schemaVersion === 2 ? ['pruning'] : []),
     ],
     'Release record',
   );
-  if (data.schemaVersion !== 1) throw new Error('Unsupported release record schema');
+  if (data.schemaVersion !== 1 && data.schemaVersion !== 2)
+    throw new Error('Unsupported release record schema');
+  if (data.schemaVersion === 2) {
+    parsePruningReference(data.pruning);
+  }
   safeIdentifier(data.profileId, 'profileId');
   safeIdentifier(data.buildId, 'buildId');
   environment(data.environment);
@@ -430,7 +460,7 @@ export function parseReleaseRecord(value: unknown): ReleaseRecord {
 }
 
 /** Validate historical metadata against its archived profile, then verify every byte and target. */
-export function validateTarget(outDir: string, target: ReleaseTarget): ReleaseRecord {
+export function validateTarget(outDir: string, target: ReleaseTarget): ReleaseRecordV2 {
   safeIdentifier(target.profileId, 'Target profileId');
   const mode = environment(target.environment);
   const recordPath = join(outDir, RELEASE_RECORD_FILE);
@@ -440,6 +470,24 @@ export function validateTarget(outDir: string, target: ReleaseTarget): ReleaseRe
   const record = parseReleaseRecord(JSON.parse(readFileSync(recordPath, 'utf8')));
   if (record.profileId !== target.profileId || record.environment !== mode)
     throw new Error('Release profile/environment does not match deployment target');
+  const delivery = parseDeliveryPolicy(target.deliveryPolicy);
+  if (delivery.profileId !== target.profileId || delivery.environment !== mode)
+    throw new Error('Delivery policy profile/environment does not match target');
+  if (record.schemaVersion !== 2)
+    throw new Error(
+      'Release schema version 2 with verified pruning is required; legacy releases must be rebuilt',
+    );
+  if (record.enabledModules.some((id) => !delivery.allowedModules.includes(id)))
+    throw new Error('Release modules exceed current target delivery policy');
+  if (
+    !delivery.allowedPruningRules.some(
+      (rule) =>
+        rule.checkerVersion === record.pruning.checkerVersion &&
+        rule.ownershipPolicyVersion === record.pruning.ownershipPolicyVersion &&
+        rule.ownershipPolicyDigest === record.pruning.ownershipPolicyDigest,
+    )
+  )
+    throw new Error('Pruning rule is not allowed by the current target delivery policy');
   const policy = parseBackendPolicy(target.backendPolicy);
   if (policy.profileId !== target.profileId || policy.environment !== mode)
     throw new Error('Backend policy profile/environment does not match target');
@@ -457,5 +505,6 @@ export function validateTarget(outDir: string, target: ReleaseTarget): ReleaseRe
     canonicalJson({ artifacts: record.artifacts, directories: record.directories })
   )
     throw new Error('Artifact integrity check failed: changed, missing, or extra files');
+  verifyPruningArtifact(outDir, record);
   return record;
 }

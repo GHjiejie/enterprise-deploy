@@ -1,6 +1,6 @@
 import type { BuildProfile, ModuleId } from '../../shared/build-profile.ts';
 import type { ModuleDefinition } from '../../shared/module-definition.ts';
-import { getEnabledModules, moduleRegistry } from '../app/module-registry.ts';
+import { getEnabledModules } from '../../shared/module-assembly.ts';
 import { canViewModule, type UserAccess } from './permissions.ts';
 
 export type ModuleCleanup = () => void | Promise<void>;
@@ -23,7 +23,7 @@ export async function activateModules(
   profile: BuildProfile,
   access: UserAccess,
   activators: Readonly<Partial<Record<ModuleId, ModuleActivator>>>,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): Promise<ModuleCleanup> {
   const cleanups: ModuleCleanup[] = [];
   try {

@@ -16,7 +16,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import type { BuildProfile } from '../shared/build-profile.ts';
 import type { ProfileEntry } from '../shared/build-console.ts';
-import { validateModuleAssembly } from '../src/app/module-registry.ts';
+import { validateModuleAssembly } from './module-catalog.ts';
 import { parseBuildProfile } from './load-profile.ts';
 import { sha256 } from './release-record.ts';
 

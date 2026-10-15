@@ -6,7 +6,7 @@
 
 ## 检查范围与产物身份
 
-代码对照提交为 `940b0b28476dc136eaeddb22108936e6e2b37996`。配置见 [qianshi.json](../config/profiles/qianshi.json)：
+代码对照提交为 `940b0b28476dc136eaeddb22108936e6e2b37996`。下文源码链接固定到该历史提交，保留整改前证据；整改结果另见[后续验证记录](pruning-verification-2026-10-15.md)。配置见 [qianshi.json](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/config/profiles/qianshi.json)：
 
 ```json
 {
@@ -60,7 +60,7 @@ staging artifactDigest:
 
 生产主入口 `index-Do4F9HLv.js`、预发布主入口 `index-CD0SruBc.js` 都保留对四个页面的动态导入。上述结论基于实际页面实现与依赖引用，不只是文件名或关键词命中。
 
-原因见 [app.tsx](../src/app/app.tsx)：`pages` 对所有模块声明 `lazy(() => import(...))`，运行时才根据企业配置决定渲染哪个页面。懒加载控制请求时机，不会自动把关闭模块从构建依赖图删除。原[架构方案第 8 节](architecture.md#8-关闭模块与物理裁剪)和 README 已明确初版只承诺行为关闭；本项记录的是当前能力与“禁止交付禁用代码”要求之间的差距。
+原因见 [app.tsx](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/src/app/app.tsx)：`pages` 对所有模块声明 `lazy(() => import(...))`，运行时才根据企业配置决定渲染哪个页面。懒加载控制请求时机，不会自动把关闭模块从构建依赖图删除。原[架构方案第 8 节](architecture.md#8-关闭模块与物理裁剪)和 README 已明确初版只承诺行为关闭；本项记录的是当前能力与“禁止交付禁用代码”要求之间的差距。
 
 整改应在构建阶段按已校验配置生成仅包含已启用模块的装配入口，并让业务应用只依赖该入口。生成入口应按构建隔离，避免修改公共源码后被其他企业构建复用。不应通过打包后手工删除 JS 文件处理，主入口及其依赖可能仍然引用这些文件。
 
@@ -75,13 +75,13 @@ staging artifactDigest:
 
 验证结束后临时文件、浏览器及临时 HTTP 服务已清理，原产物摘要保持一致。临时副本没有重算或修改发布清单，也没有通过 `release:deploy` 部署；本结果证明浏览器端界面可恢复，不证明发布校验被绕过。
 
-[features.ts](../src/platform/features.ts) 中的 `Object.freeze` 用于防止应用运行过程中的意外赋值，不能限制持有静态文件的人在执行前修改 JavaScript。客户也可以修改前端路由或重新编写界面，因此即使代码裁剪完成，真实业务能力仍应由服务端独立授权。OWASP 建议在服务端等可信位置执行授权，并逐请求验证权限。[授权检查依据](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html#verify-that-authorization-checks-are-performed-in-the-right-location)
+[features.ts](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/src/platform/features.ts) 中的 `Object.freeze` 用于防止应用运行过程中的意外赋值，不能限制持有静态文件的人在执行前修改 JavaScript。客户也可以修改前端路由或重新编写界面，因此即使代码裁剪完成，真实业务能力仍应由服务端独立授权。OWASP 建议在服务端等可信位置执行授权，并逐请求验证权限。[授权检查依据](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html#verify-that-authorization-checks-are-performed-in-the-right-location)
 
 整改要分别处理两类目标：通过构建裁剪减少未开放实现的暴露；通过可信登录身份、企业关系和服务端能力策略保护真实操作。是否禁止图片 API 能力需要独立产品约定，不能从“关闭图片体验页面”自动推导。
 
 ### R03 图片逻辑保留在视频共用组件中
 
-production 的 `studio-page-4ekoWoYj.js` 和 staging 的 `studio-page-Cgxi8YMd.js` 都保留图片与视频分支。源码 [studio-page.tsx](../src/shared/studio-page.tsx) 接受 `kind: 'image' | 'video'`，根据参数渲染不同标题和创作描述。
+production 的 `studio-page-4ekoWoYj.js` 和 staging 的 `studio-page-Cgxi8YMd.js` 都保留图片与视频分支。源码 [studio-page.tsx](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/src/shared/studio-page.tsx) 接受 `kind: 'image' | 'video'`，根据参数渲染不同标题和创作描述。
 
 这是 R01 的另一条依赖路径。仅移除图片页面的动态导入，不足以证明图片专属实现已经清除。应把模块专属行为放回对应模块，或在构建时固定参数并通过依赖和实际输出检查确认分支被消除。
 
@@ -89,9 +89,9 @@ production 的 `studio-page-4ekoWoYj.js` 和 staging 的 `studio-page-Cgxi8YMd.j
 
 ### R04 当前验收未验证禁用代码不存在
 
-[交付浏览器测试](../tests/delivery/browser.spec.ts) 当前验证关闭模块的路径显示页面不存在、管理员不能打开模块，以及页面请求未加载相关 `page-*` 代码块。这些测试验证了正常入口行为，没有断言代码块不在磁盘或交付包中。
+[交付浏览器测试](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/tests/delivery/browser.spec.ts) 当前验证关闭模块的路径显示页面不存在、管理员不能打开模块，以及页面请求未加载相关 `page-*` 代码块。这些测试验证了正常入口行为，没有断言代码块不在磁盘或交付包中。
 
-[发布记录校验](../build/release-record.ts) 检查企业、环境、配置与文件摘要一致。清单根据实际输出生成，正确包含禁用代码的包也可以通过完整性校验；它没有验证每个输出模块是否属于本企业允许交付的范围。
+[发布记录校验](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/build/release-record.ts) 检查企业、环境、配置与文件摘要一致。清单根据实际输出生成，正确包含禁用代码的包也可以通过完整性校验；它没有验证每个输出模块是否属于本企业允许交付的范围。
 
 应新增单独的物理裁剪验收，结合构建依赖信息、模块资源归属与实际输出清单核对禁用模块的专属实现和资源。模块名、文件名或文案搜索可以辅助定位，不能作为唯一依据。命令行构建、可视化打包、交付归档应使用同一条验收链路。
 
@@ -101,7 +101,7 @@ production 的 `studio-page-4ekoWoYj.js` 和 staging 的 `studio-page-Cgxi8YMd.j
 
 生产接入还需要处理以下已知边界，它们不代表本次已经发现真实服务漏洞：
 
-- [permissions.ts](../src/platform/permissions.ts) 使用明确标记的 `DEMO_ACCESS`，页面提供演示角色切换，默认选择完整权限的演示用户。正式应用需要接入可信身份和权限数据，并移除演示身份入口；演示角色不是安全认证。
+- [permissions.ts](https://github.com/GHjiejie/enterprise-deploy/blob/940b0b28476dc136eaeddb22108936e6e2b37996/src/platform/permissions.ts) 使用明确标记的 `DEMO_ACCESS`，页面提供演示角色切换，默认选择完整权限的演示用户。正式应用需要接入可信身份和权限数据，并移除演示身份入口；演示角色不是安全认证。
 - 当前对话和生成页只实现演示 UI 与输入校验，未连接真实业务服务。恢复页面不能据此证明可以生成图片、消耗模型额度或访问他人数据；接入后端后要另行验证越权与企业隔离。
 - `demo-qianshi-*.json` 仅为演示兼容声明，不代表后端已经关闭某项能力。实际授权以服务端可信策略为准。
 - SHA-256 清单用于检查一致性，不是数字签名。有权同时替换文件和清单的人可以重新计算摘要；可信交付仍依赖受控 CI、制品库和部署权限，按交付需求增加独立签名校验。

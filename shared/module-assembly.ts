@@ -1,21 +1,9 @@
-import { MODULE_IDS, type BuildProfile, type ModuleId } from '../../shared/build-profile.ts';
-import type { ModuleDefinition, ModuleRoute } from '../../shared/module-definition.ts';
-import { chatModule } from '../modules/chat/module.ts';
-import { imageStudioModule } from '../modules/image-studio/module.ts';
-import { modelCatalogModule } from '../modules/model-catalog/module.ts';
-import { videoStudioModule } from '../modules/video-studio/module.ts';
-
-/** Metadata only: importing this registry never imports pages or starts requests. */
-export const moduleRegistry: readonly ModuleDefinition[] = [
-  modelCatalogModule,
-  chatModule,
-  imageStudioModule,
-  videoStudioModule,
-];
+import { MODULE_IDS, type BuildProfile, type ModuleId } from './build-profile.ts';
+import type { ModuleDefinition, ModuleRoute } from './module-definition.ts';
 
 export function getEnabledModules(
   profile: BuildProfile,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): readonly ModuleDefinition[] {
   return registry.filter((module) => profile.modules[module.id] === true);
 }
@@ -26,7 +14,7 @@ export function getEntryRoute(module: ModuleDefinition): ModuleRoute | undefined
 
 export function validateModuleAssembly(
   profile: BuildProfile,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): void {
   const knownIds = new Set<ModuleId>(MODULE_IDS);
   const registeredIds = new Set<ModuleId>();
@@ -38,6 +26,9 @@ export function validateModuleAssembly(
       throw new Error(`未知或重复的模块注册：${module.id}`);
     }
     registeredIds.add(module.id);
+    if (!module.display.title.trim() || !module.display.icon.trim()) {
+      throw new Error(`模块 ${module.id} 缺少页面展示信息`);
+    }
     if (!module.viewPermission.trim()) {
       throw new Error(`模块 ${module.id} 缺少页面权限标识`);
     }

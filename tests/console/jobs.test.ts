@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { BuildProfile } from '../../shared/build-profile.ts';
+import type { BuildStage } from '../../shared/build-console.ts';
 import {
   createConsoleJobManager,
   runConsoleBuild,
@@ -27,6 +28,7 @@ import {
   scanArtifacts,
   sha256,
 } from '../../build/release-record.ts';
+import { writeFixturePruningReport } from '../helpers/pruned-artifact.ts';
 
 const roots: string[] = [];
 const managers: ConsoleJobManager[] = [];
@@ -59,11 +61,13 @@ function writeArtifact(run: ConsoleBuildRun, overrides: Record<string, unknown> 
   mkdirSync(join(outDir, 'assets'), { recursive: true });
   writeFileSync(join(outDir, 'index.html'), '<script src="/assets/app.js"></script>');
   writeFileSync(join(outDir, 'assets/app.js'), JSON.stringify(run.profile));
+  const pruning = writeFixturePruningReport(outDir, run.profile, run.mode, run.jobId);
   const files = scanArtifacts(outDir);
   writeFileSync(
     join(outDir, RELEASE_RECORD_FILE),
     JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
+      pruning,
       profileId: run.profile.id,
       environment: run.mode,
       appVersion: '0.1.0',
@@ -148,6 +152,37 @@ describe('console profile storage', () => {
 });
 
 describe('console build jobs', () => {
+  it('reports only complete recognized build-stage lines from the real child output', async () => {
+    const { rootDir, profilesDir } = fixture(async () => 1);
+    writeFileSync(
+      join(rootDir, 'package.json'),
+      JSON.stringify({ scripts: { build: 'node stages.cjs' } }),
+    );
+    writeFileSync(
+      join(rootDir, 'stages.cjs'),
+      `
+      process.stdout.write('[build-stage] vali');
+      setTimeout(() => {
+        process.stdout.write('dating\\n[build-stage] compiling\\n');
+        process.stdout.write('[build-stage] complete\\n[build-stage] pruning\\n');
+      }, 20);
+    `,
+    );
+    const stages: BuildStage[] = [];
+    const exit = await runConsoleBuild({
+      jobId: 'stage-fixture',
+      rootDir,
+      profilesDir,
+      profile: profile(),
+      mode: 'production',
+      signal: new AbortController().signal,
+      onOutput: () => {},
+      onStage: (stage) => stages.push(stage),
+    });
+    expect(exit).toBe(0);
+    expect(stages).toEqual(['validating', 'compiling', 'pruning']);
+  });
+
   it('pins submitted config, snapshots output and produces a verified downloadable archive', async () => {
     let captured: ConsoleBuildRun | undefined;
     const { store, jobs, profilesDir } = fixture(async (run) => {
@@ -178,6 +213,13 @@ describe('console build jobs', () => {
     expect(job.log).toContain('build output');
     expect(job.result?.buildId).toBe(job.id);
     expect(job.result?.previewUrl).toBe(`/api/builds/${job.id}/preview`);
+    expect(job.stage).toBe('complete');
+    expect(job.result?.pruning).toMatchObject({
+      status: 'passed',
+      enabledModules: ['modelCatalog', 'chat'],
+      excludedModules: ['imageStudio', 'videoStudio'],
+      reportDownloadUrl: `/api/builds/${job.id}/pruning-report`,
+    });
     expect(job.startedAt).not.toBeNull();
     expect(job.finishedAt).not.toBeNull();
     const artifact = jobs.getArtifact(job.id)!;
@@ -187,8 +229,52 @@ describe('console build jobs', () => {
       encoding: 'utf8',
     });
     expect(JSON.parse(archived).profile).toEqual(job.profile);
+    expect(JSON.parse(jobs.readReport(job.id)!.toString('utf8')).enabledModules).toEqual([
+      'modelCatalog',
+      'chat',
+    ]);
+    expect(jobs.readPackage(job.id)).toEqual(readFileSync(artifact.packagePath));
     writeFileSync(join(captured!.rootDir, job.result!.outDir, 'index.html'), 'new build');
     expect(readFileSync(join(artifact.siteDirectory, 'index.html'), 'utf8')).toContain('<script');
+  });
+
+  it.each(['snapshot', 'package', 'report'])(
+    'refuses %s changes after successful build before access',
+    async (kind) => {
+      const { jobs, store } = fixture(async (run) => {
+        writeArtifact(run);
+        return 0;
+      });
+      const started = jobs.start(profile(), store.list()[0]!.revision, 'production');
+      expect((await finished(jobs, started.job.id)).status).toBe('succeeded');
+      const artifact = jobs.getArtifact(started.job.id)!;
+      const target =
+        kind === 'package'
+          ? artifact.packagePath
+          : kind === 'report'
+            ? artifact.reportPath
+            : join(artifact.siteDirectory, 'assets/app.js');
+      writeFileSync(target, 'tampered');
+      expect(() => jobs.getArtifact(started.job.id)).toThrow();
+      expect(() => jobs.readPackage(started.job.id)).toThrow();
+      expect(() => jobs.readReport(started.job.id)).toThrow();
+    },
+  );
+
+  it('rejects a legacy V1 success record without presenting pruning success', async () => {
+    const { jobs, store } = fixture(async (run) => {
+      const outDir = writeArtifact(run);
+      const recordPath = join(outDir, RELEASE_RECORD_FILE);
+      const { pruning: _pruning, ...record } = JSON.parse(readFileSync(recordPath, 'utf8'));
+      writeFileSync(recordPath, JSON.stringify({ ...record, schemaVersion: 1 }));
+      return 0;
+    });
+    const started = jobs.start(profile(), store.list()[0]!.revision, 'production');
+    const job = await finished(jobs, started.job.id);
+    expect(job.status).toBe('failed');
+    expect(job.stage).toBe('failed');
+    expect(job.result).toBeNull();
+    expect(job.error).toContain('V2');
   });
 
   it('blocks concurrent builds before saving their profiles and bounds log output', async () => {

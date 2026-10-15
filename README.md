@@ -1,8 +1,8 @@
 # enterprise-deploy
 
-一套代码，通过版本化企业配置独立构建、独立交付。基于 Vite、React、TypeScript，企业差异固定在构建时，用户权限独立在运行时判断。
+一套代码，通过版本化企业配置独立构建、独立交付。基于 Vite、React、TypeScript，企业模块在构建时装配并进行物理裁剪，用户页面权限在运行时独立判断。
 
-仓库原先只有 README，本实现建立了架构方案中的最小业务演示和完整交付基础。模型、对话、图片、视频页面均为明确标记的本地演示；没有虚构或调用后端接口。真实身份、权限、模型、生成任务与企业服务端授权需要接入现有业务服务。
+关闭模块的私有实现、文案、样式及专属资源不得进入该企业交付包。构建使用仅包含已启用模块的虚拟入口，并检查浏览器构建依赖图、输出归属和最终文件。模型、会话、图片、视频页面仍为本地演示，没有连接真实业务后端；真实身份和服务端逐请求授权属于后续接入工作。
 
 ## 可视化配置与打包
 
@@ -13,9 +13,9 @@ npm ci
 npm run configure
 ```
 
-打开 http://127.0.0.1:5180 ，选择或新建企业，勾选开放模块、设置默认页面和构建环境，再点击「保存并构建」。页面会显示真实日志，成功后可预览该次构建并下载 `.tar.gz` 交付包。
+打开 http://127.0.0.1:5180 ，选择或新建企业，勾选开放模块、设置默认页面和构建环境，再点击「保存并构建」。页面展示配置校验、编译与裁剪、快照和压缩包复验的实际阶段与日志；成功后可以预览固定版本、下载 `.tar.gz` 交付包和裁剪报告。
 
-配置会保存到企业 JSON，构建使用隔离配置快照；已构建的版本保持固定。构建控制台是独立的本地工具，不加入客户静态包。用户角色权限仍由业务系统处理。详见 [可视化控制台说明](docs/build-console.md)。
+配置保存到企业 JSON，构建使用隔离快照。构建控制台是独立的本地工具，不加入客户静态包；它不配置用户角色，也不会自动放宽部署目标允许的模块上限。详见 [可视化控制台说明](docs/build-console.md)。
 
 ## 本地运行
 
@@ -23,7 +23,7 @@ npm run configure
 
 ```bash
 npm ci
-APP_PROFILE=enterprise-a npm run dev
+APP_PROFILE=qianshi npm run dev
 ```
 
 打开 http://127.0.0.1:5173 。必须显式设置 `APP_PROFILE`，没有默认全功能降级。修改企业配置后重启开发服务器。
@@ -33,103 +33,110 @@ APP_PROFILE=enterprise-a npm run dev
 | `standard`     | 开启     | 开启     | 开启         | 开启         |
 | `enterprise-a` | 开启     | 开启     | 关闭         | 关闭         |
 | `enterprise-b` | 开启     | 开启     | 开启         | 开启         |
+| `qianshi`      | 关闭     | 关闭     | 关闭         | 开启         |
 
-页面的「演示权限」选择器用于验证完整权限、管理员、仅对话权限、无页面权限和未登录情形。它不是生产认证功能。管理员也不能打开构建时关闭的模块。
+页面的「演示权限」选择器用于验证管理员、普通成员、仅对话权限、无页面权限和未登录情形。当前演示产物即使使用 `production` 模式也仍包含演示身份；它不能作为生产认证或真实 API 授权。生产业务接入必须替换该适配器和演示入口。管理员也无法从活动注册表访问未交付的模块。
 
 ## 构建与验证
 
 ```bash
 npm run check
+npm run test:pruning
 npm run test:console
-APP_PROFILE=enterprise-a npm run build -- --mode staging
-APP_PROFILE=enterprise-a npm run build -- --mode production
-APP_PROFILE=enterprise-b npm run build -- --mode production
+APP_PROFILE=qianshi npm run build -- --mode staging
+APP_PROFILE=qianshi npm run build -- --mode production
 
-# 浏览器冒烟测试针对已经构建的静态产物运行
+# 对实际输出独立复验 V2 记录、裁剪报告及文件
+npm run pruning:verify -- --artifact dist/qianshi/production
+
+# 浏览器冒烟针对已经构建的静态产物运行
 npx playwright install chromium
-APP_PROFILE=enterprise-a APP_MODE=production npm run test:delivery
+APP_PROFILE=qianshi APP_MODE=production npm run test:delivery
 
-# 在本地顺序验收全部企业的 staging / production 产物
+# 本地顺序验收全部已保存企业 × staging / production
 npm run test:matrix
 
-# 查看一个已构建企业版本
-APP_PROFILE=enterprise-a npm run preview -- --mode production
+# 通过 HTTP 预览，不能双击 index.html 使用 file:// 打开
+APP_PROFILE=qianshi npm run preview -- --mode production
 ```
 
-支持的环境仅有 `development`、`staging`、`production`。产物分别输出到 `dist/<企业>/<环境>/`，每份产物含 `release-record.json`。发布构建拒绝 `.env.local` 和对应 `.env.<mode>.local`，CI 使用隔离作业。不要向任何浏览器环境变量写入秘密。
+预览地址默认为 http://127.0.0.1:4173 。环境仅支持 `development`、`staging`、`production`。输出位于 `dist/<企业>/<环境>/`，可交付版本必须同时含 `pruning-report.json` 和 `schemaVersion: 2` 的 `release-record.json`。
 
-`npm run check` 包含格式与严格类型检查、全部企业配置和模块组合校验、配置/装配/控制台/发布单元测试。GitHub Actions 自动发现已保存的企业配置，对 staging/production 执行构建、浏览器冒烟和发布校验，然后归档对应产物；控制台有独立浏览器工作流验收。
+`npm run build -- --mode ...` 是完整构建入口：取得企业/环境输出锁、使旧记录失效、完成类型和配置检查、编译与裁剪、生成报告及 V2 记录，再复验实际文件。协调器失败会清除成功记录并释放自己的锁。直接执行 `vite build` 也受构建图和输出门禁约束，但不生成可交付的 V2 成功记录；请使用 npm 构建入口。发布构建拒绝 `.env.local` 和对应 `.env.<mode>.local`，不要向浏览器环境变量写入秘密。
+
+`npm run check` 包含格式、严格类型、全部企业配置与基础单元测试。`test:pruning` 是独立必需验收，验证四模块的 15 个非空组合 × 两种发布环境，以及禁用依赖、私有资源、未知输出、原始 Vite、篡改和输出锁等负向情形。GitHub Actions 将组合验证放在独立作业，企业交付矩阵只运行各自真实构建、浏览器、裁剪和目标发布校验。
 
 ## 代码边界
 
 ```text
 config/profiles/                完整、显式的企业模块配置
 config/backend-compatibility.json   前端声明的后端兼容条件
-config/backend-policies/        发布验证用的演示目标策略
-shared/build-profile.ts         模块标识、企业类型、环境类型
-shared/module-definition.ts     无副作用的模块元数据契约
-build/load-profile.ts           严格读取、字段/类型/版本校验
-build/validate-profiles.ts      全部配置和装配组合校验
-build/release-record.ts         公开元数据、源码与制品摘要、目标校验
-build/release-cli.ts            本地归档、原子发布、回滚命令
-build/console-*.ts              本地配置、构建任务、下载与独立产物预览
-build-console/                 独立的可视化企业配置界面
-src/app/module-registry.ts      所有模块元数据的共同注册表
-src/app/router.ts               页面加载前的路由与权限判断
-src/app/navigation.ts           同一模块集合生成导航
-src/platform/                  统一开关、权限、跳转、显式生命周期
-src/modules/                   各模块元数据与演示页面
-src/shared/                    独立的公共上传、模型元数据与入口组件
-tests/profiles/                 配置、装配、路由、权限与生命周期测试
-tests/delivery/                 制品完整性、交付目标与浏览器冒烟测试
-deploy/nginx.conf              静态站点的缓存和路由示例
+config/backend-policies/        发布兼容校验用的演示目标声明
+config/delivery-policies/       独立可信目标的模块上限与允许裁剪规则
+shared/module-assembly.ts       无导入副作用的装配算法
+build/module-catalog.ts         Node/控制台使用的完整模块目录
+build/active-modules-plugin.ts  按企业生成 virtual:enterprise-modules
+build/enterprise-config.ts      统一企业构建上下文与 Vite 配置
+build/build-enterprise.ts       完整构建协调器
+build/output-lock.ts            企业/环境输出锁与记录失效
+build/pruning-plugin.ts         浏览器图、私有依赖与输出来源检查
+build/pruning.ts                裁剪报告协议与统一最终文件验证器
+build/release-record.ts         V1 历史读取、V2 记录、交付目标校验
+build/release-cli.ts            本地归档、公开 generation、发布与回滚
+build/console-*.ts              配置、任务、严格打包与固定预览
+build-console/                 独立可视化配置界面
+src/app/                       消费活动注册表的路由、页面与导航
+src/platform/                  权限、跳转与显式生命周期
+src/modules/                   各模块私有业务、数据、文案和样式
+src/shared/                    通用表单、上传、任务展示等公共能力
+tests/pruning/                 30 组合与裁剪负向验证
+tests/profiles/                配置、装配、路由与生命周期测试
+tests/console/                 控制台、包安全、固定预览与下载测试
+tests/delivery/                发布策略、完整性、迁移及浏览器冒烟
+deploy/nginx.conf              current/site 与 current/assets 示例
 ```
 
-模块定义只声明路由、导航、入口、权限标识和必要依赖，不在导入时请求数据或启动轮询。`activateModules` 提供显式启动与反向清理扩展点；当前演示模块没有启动副作用。真实模块需要把初始化放在该入口或权限已通过的页面生命周期内。
+客户应用只获得已启用模块的元数据、页面加载器与启动器；完整目录只供 Node 构建工具和控制台使用。公共层不能反向导入模块私有实现，模块不能跨越其他模块的私有目录。无法证明来源的输出、外部代码加载、source map 和未支持的资源形态会使构建失败，不能用一个空归属数组绕过检查。
 
-路由解析先筛选已启用模块，再检查当前用户权限，最后才渲染懒加载页面。图片、视频的规范路径、任务详情、旧路径别名和通用 playground 分支都使用相同规则。关闭的路径显示页面不存在；启用但无权限的页面进入登录或无权限状态。
+模块定义只声明路由、导航、入口、权限标识和依赖。`activateModules` 提供显式启动与反向清理扩展点；真实初始化必须放在该入口或权限已通过的页面生命周期内。路由、导航、快捷入口、旧别名、通用 playground 和详情深链均使用同一份活动注册表。
 
-模型卡片按照明确的 `capability` 元数据展示。关闭图片/视频体验只隐藏对应在线入口；保留模型卡片不代表授予 API 权限。快捷入口、模型体验按钮、体验搜索和历史跳转均通过统一跳转服务。智能对话的图片/文件上传独立于图片生成模块。
+公共上传与图片生成业务独立：视频或对话需要的图片/文件上传可以保留，不以 `image` 字符串是否出现判断泄漏。模型卡片保留某种 API 能力描述也不代表授予页面或 API 权限；完整模型业务数据只属于模型广场模块。
 
 ## 增加企业或模块
 
-增加企业：运行 `npm run configure`，在页面中新建企业并明确选择模块与默认入口，保存或一键构建。也可以手动新增完整 `config/profiles/<id>.json`。校验与 CI 自动发现企业配置；参加正式发布验收时，为该企业增加实际目标后端策略。不存在配置继承或隐式覆盖。
+增加企业：使用控制台，或新增完整 `config/profiles/<id>.json`。校验与 CI 自动发现企业配置，不存在隐式继承。参加目标发布验收时，另外提供对应企业/环境的可信后端兼容声明和交付策略；不要从待发布包自动生成或放宽目标上限。
 
-增加模块：更新 `MODULE_IDS`、每份受支持企业配置、模块元数据和页面映射；未确认企业显式填写 `false`。配置缺失模块字段会失败。入口与依赖不满足、未知字段、字符串布尔值、无效模式及配置 ID 不一致均会失败。新增模块时同时检查页面内快捷入口、搜索、通知/历史跳转、预加载与公共资源依赖。
+增加模块：更新模块 ID、所有受支持企业的完整配置、Node 目录、模块元数据与私有入口，同时更新归属规则、目标策略和测试。未开放的企业明确填写 `false`；缺字段、无效依赖、默认入口关闭或未知字段均会失败。新增模块必须验证路由、资源、共享层引用、预加载与生命周期的完整依赖范围。
 
 ## 归档、部署和回滚
 
-当前提供可验证的**本地文件系统部署适配器**，没有假定真实服务器、SSH、Kubernetes 或企业域名。请参阅 [交付操作说明](docs/delivery.md) 的完整命令与目标目录约束。
+当前提供**本地文件系统部署适配器**，实际服务器、SSH、Kubernetes、CDN 或域名需要接入已有交付体系。完整命令和首次迁移步骤见 [交付操作说明](docs/delivery.md)。
 
 ```bash
-APP_PROFILE=enterprise-a npm run build -- --mode production
 npm run release:verify -- \
-  --profile enterprise-a --mode production \
-  --artifact dist/enterprise-a/production \
-  --backend-policy config/backend-policies/demo-enterprise-a-production.json
+  --profile qianshi --mode production \
+  --artifact dist/qianshi/production \
+  --backend-policy config/backend-policies/demo-qianshi-production.json \
+  --delivery-policy config/delivery-policies/demo-qianshi-production.json
 
 npm run release:deploy -- \
-  --profile enterprise-a --mode production \
-  --artifact dist/enterprise-a/production \
-  --target deployments/enterprise-a-production \
-  --backend-policy config/backend-policies/demo-enterprise-a-production.json
+  --profile qianshi --mode production \
+  --artifact dist/qianshi/production \
+  --target deployments/qianshi-production \
+  --backend-policy config/backend-policies/demo-qianshi-production.json \
+  --delivery-policy config/delivery-policies/demo-qianshi-production.json
 ```
 
-部署会先校验企业、环境、后端兼容条件和实际文件摘要，归档后原子切换 `current`。旧资源保留以支持已打开页面与回滚。演示后端策略仅用于运行交付闭环，不能代表真实后端已经实施能力限制。生产需从可信部署流程获得目标策略并保留受控制品。
+发布和回滚只接受通过当前目标策略的 V2：企业/环境一致、开启模块不超过当前上限、裁剪规则版本与摘要被允许、后端兼容且实际文件一致。旧 V1 必须重新构建，不能通过补空报告或修改版本号升级。
 
-发布记录包含构建配置及其摘要、启用模块、应用版本、Git 提交、工作区源码状态与摘要、工具链版本、锁文件摘要、构建命令、构建 ID、后端兼容条件和实际产物清单/摘要。源码未提交时会标记为 dirty，不能仅凭 Git 提交重现该构建。摘要用于完整性核对；来源可信性仍依赖 CI、制品库与访问控制。
+部署先保存私有归档，再准备 `public-generations/<id>/site` 和只含当前策略合规版本的 `assets`，最后原子切换同一个 `current` 指针。模块收缩后不合规旧资源不进入新公开集合，旧 URL 返回 404，旧标签页可能需要刷新。**首次升级必须同步应用新的 Nginx 根路径**；继续使用旧根 `/assets/` 配置仍会暴露旧资源。历史归档、旧根资源与证据不会自动删除。
 
-## 交付边界
+## 交付与安全边界
 
-- 已实现构建时企业装配、统一入口控制、运行时页面权限适配、制品追溯、发布目标校验、归档和本地原子回滚。
-- 提供打包前的本地可视化模块配置、真实构建日志、固定版本预览与下载；不提供远程配置管理平台。
-- 不提供运行时企业功能热切换，不承诺禁用代码物理裁剪。禁用模块的代码块可能仍在静态包中。
-- 不改变模型 API 商业权益、历史数据或进行中的任务。前端开关不能替代服务端逐请求授权。
-- 真实后端与生产部署平台尚未接入。Nginx 示例中的 SPA 页面不存在仍可能是 HTTP 200，需要真实 HTTP 404 时单独由服务层实现。
-- 已打开的旧页面需要服务端限制与刷新策略配合；本地部署保留旧资源且 HTML 重新验证，避免新旧资源混用。
+- 当前整改覆盖构建装配、私有实现与资源裁剪、V2 证据、控制台快照/包复验及本地发布策略；技术方案 P1–P5 已通过本地验收，产物身份、矩阵及迁移限制见[整改验证记录](docs/pruning-verification-2026-10-15.md)。
+- 前端裁剪降低禁用实现随包交付的风险，不能阻止客户编写新代码，也不能召回已下载或已缓存的旧副本。
+- 企业模块开关不决定模型 API 商业权益、历史数据或运行中任务。真实服务端必须逐请求验证身份、企业权益、用户权限及资源归属。
+- 演示身份与 `demo-*.json` 兼容/交付策略仅用于本地流程，不代表生产授权或可信制品来源。SHA-256 检查字节一致性，真实来源依赖受控 CI、制品库、部署权限及所需签名机制。
+- 不提供运行时模块热切换或远程配置平台。Nginx 缺失静态资源返回真实 404；SPA 内部页面不存在仍可能由 HTTP 200 的 HTML 展示。
 
-实现依据为用户提供的 [架构原文](docs/architecture.md)。构建常量和环境机制遵循 [Vite define](https://vite.dev/config/shared-options#define) 与 [Env Variables and Modes](https://vite.dev/guide/env-and-mode)。
-
-## 本地风险记录
-
-[2026 年 10 月 15 日本地风险评估](docs/local-risk-assessment-2026-10-15.md) 记录了 `qianshi` 产物中禁用模块代码仍被交付、修改前端副本可恢复隐藏界面，以及共享代码和物理裁剪验收的缺口。报告包含产物身份、文件证据、受控浏览器对照、整改建议和验收要求；恢复界面不代表已验证真实 API 越权。
+原始依据见 [架构原文](docs/architecture.md)。[2026 年 10 月 15 日本地风险评估](docs/local-risk-assessment-2026-10-15.md) 保留整改前产物及受控恢复界面的证据，不改写原始审计结论。[企业模块物理裁剪与交付校验技术方案（V2）](docs/enterprise-build-pruning-design.md) 记录本轮设计与完成标准，P6 真实业务后端待接入。

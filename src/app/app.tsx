@@ -1,28 +1,20 @@
 import { Component, lazy, Suspense, useState } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
+import type { ComponentType, ErrorInfo, LazyExoticComponent, ReactNode } from 'react';
 import { Link, Navigate, NavLink, useLocation } from 'react-router-dom';
 import type { ModuleId } from '../../shared/build-profile.ts';
 import { buildProfile } from '../platform/features.ts';
 import { DEMO_ACCESS } from '../platform/permissions.ts';
-import { moduleLabels } from '../shared/model-data.ts';
+import { activeRegistry, pageLoaders } from './active-modules.ts';
 import { getNavigation } from './navigation.ts';
 import { resolveAppRoute } from './router.ts';
 import { AccessContext, PageParamsContext } from './page-context.tsx';
 
-// These imports run only after the assembly and permission check below.
-// This is behavioral gating; the build may still contain disabled chunks.
-const pages = {
-  modelCatalog: lazy(() => import('../modules/model-catalog/page.tsx')),
-  chat: lazy(() => import('../modules/chat/page.tsx')),
-  imageStudio: lazy(() => import('../modules/image-studio/page.tsx')),
-  videoStudio: lazy(() => import('../modules/video-studio/page.tsx')),
-};
-const moduleIcons: Record<ModuleId, string> = {
-  modelCatalog: '◈',
-  chat: '◌',
-  imageStudio: '▧',
-  videoStudio: '▷',
-};
+// Lazy imports are generated per build; disabled modules have no loader here.
+const pages: Partial<Record<ModuleId, LazyExoticComponent<ComponentType>>> = {};
+for (const module of activeRegistry) {
+  const loader = pageLoaders[module.id];
+  if (loader) pages[module.id] = lazy(loader);
+}
 const roles = [
   { id: 'member', label: '完整权限用户' },
   { id: 'admin', label: '管理员' },
@@ -59,14 +51,18 @@ export function App() {
   const [role, setRole] = useState<DemoRole>('member');
   const access = DEMO_ACCESS[role];
   const location = useLocation();
-  const navigation = getNavigation(buildProfile, access);
-  const route = resolveAppRoute(location.pathname, buildProfile, access);
-  const activeLabel = route.kind === 'page' ? moduleLabels[route.moduleId] : '企业工作台';
+  const navigation = getNavigation(buildProfile, access, activeRegistry);
+  const route = resolveAppRoute(location.pathname, buildProfile, access, activeRegistry);
+  const activeLabel =
+    route.kind === 'page'
+      ? (activeRegistry.find((module) => module.id === route.moduleId)?.display.title ??
+        '企业工作台')
+      : '企业工作台';
   let content: ReactNode;
   if (route.kind === 'redirect') content = <Navigate to={route.to} replace />;
   else if (route.kind === 'page') {
     const Page = pages[route.moduleId];
-    content = (
+    content = Page ? (
       <PageParamsContext.Provider value={route.params}>
         <PageBoundary key={location.pathname}>
           <Suspense
@@ -80,6 +76,10 @@ export function App() {
           </Suspense>
         </PageBoundary>
       </PageParamsContext.Provider>
+    ) : (
+      <div className="empty-state" data-testid="route-not-found">
+        <h1>页面不存在</h1>
+      </div>
     );
   } else {
     const messages = {
@@ -137,7 +137,7 @@ export function App() {
                     to={item.href}
                     className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
                   >
-                    <span aria-hidden="true">{moduleIcons[item.moduleId]}</span>
+                    <span aria-hidden="true">{item.icon}</span>
                     {item.label}
                   </NavLink>
                 ))}

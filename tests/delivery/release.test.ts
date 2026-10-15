@@ -11,10 +11,18 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  CHECKER_VERSION,
+  OWNERSHIP_POLICY_DIGEST,
+  OWNERSHIP_POLICY_VERSION,
+} from '../../build/pruning.ts';
+import { parseDeliveryPolicy } from '../../build/delivery-policy.ts';
+import { writeFixturePruningReport } from '../helpers/pruned-artifact.ts';
 import type { BuildProfile } from '../../shared/build-profile.ts';
 import {
   canonicalJson,
   RELEASE_RECORD_FILE,
+  parseReleaseRecord,
   sha256,
   validateTarget,
   writeReleaseRecord,
@@ -43,6 +51,20 @@ const compatibility: BackendCompatibility = {
 const target: ReleaseTarget = {
   profileId: 'enterprise-a',
   environment: 'production',
+  deliveryPolicy: {
+    schemaVersion: 1,
+    profileId: 'enterprise-a',
+    environment: 'production',
+    allowedModules: ['modelCatalog', 'chat'],
+    minReleaseSchemaVersion: 2,
+    allowedPruningRules: [
+      {
+        checkerVersion: CHECKER_VERSION,
+        ownershipPolicyVersion: OWNERSHIP_POLICY_VERSION,
+        ownershipPolicyDigest: OWNERSHIP_POLICY_DIGEST,
+      },
+    ],
+  },
   backendPolicy: {
     schemaVersion: 1,
     profileId: 'enterprise-a',
@@ -53,7 +75,12 @@ const target: ReleaseTarget = {
   },
 };
 
-function fixture(buildId = 'release-one', version = 'one') {
+function fixture(
+  buildId = 'release-one',
+  version = 'one',
+  selectedProfile = profile,
+  assetOverride?: string,
+) {
   const root = mkdtempSync(join(tmpdir(), 'enterprise-release-'));
   temporaryRoots.push(root);
   const outDir = join(root, 'dist');
@@ -69,7 +96,7 @@ function fixture(buildId = 'release-one', version = 'one') {
     }),
   );
   writeFileSync(join(root, '.env.local'), 'SERVER_SECRET=never-serialize-this\n');
-  const assetName = `index-${sha256(version).slice(0, 12)}.js`;
+  const assetName = assetOverride ?? `index-${sha256(version).slice(0, 12)}.js`;
   writeFileSync(join(outDir, 'assets', assetName), `console.log(${JSON.stringify(version)})`);
   writeFileSync(
     join(outDir, 'index.html'),
@@ -78,9 +105,10 @@ function fixture(buildId = 'release-one', version = 'one') {
   const record = writeReleaseRecord({
     rootDir: root,
     outDir,
-    profile,
+    profile: selectedProfile,
     mode: 'production',
     buildId,
+    pruning: writeFixturePruningReport(outDir, selectedProfile, 'production', buildId),
     gitCommit: 'a'.repeat(40),
     backendCompatibility: compatibility,
   });
@@ -92,6 +120,97 @@ afterEach(() => {
 });
 
 describe('release records and target verification', () => {
+  it('requires explicit legacy creation and refuses V1 at every new delivery boundary', () => {
+    const { root, outDir } = fixture();
+    const options = {
+      rootDir: root,
+      outDir,
+      profile,
+      mode: 'production',
+      buildId: 'legacy-release',
+      gitCommit: 'a'.repeat(40),
+      backendCompatibility: compatibility,
+    };
+    expect(() => writeReleaseRecord(options)).toThrow(/require verified pruning/u);
+    const legacy = writeReleaseRecord({ ...options, legacy: true });
+    expect(parseReleaseRecord(legacy).schemaVersion).toBe(1);
+    expect(() => validateTarget(outDir, target)).toThrow(/legacy releases must be rebuilt/u);
+    expect(() => archiveRelease(outDir, join(root, 'deployment'), target)).toThrow(
+      /schema version 2/u,
+    );
+    expect(() => deployRelease(outDir, join(root, 'deployment'), target)).toThrow(
+      /schema version 2/u,
+    );
+    expect(existsSync(join(root, 'deployment'))).toBe(false);
+  });
+
+  it('uses trusted target module limits and pruning rule versions independently of the archive', () => {
+    const { outDir } = fixture();
+    expect(() =>
+      validateTarget(outDir, {
+        ...target,
+        deliveryPolicy: { ...target.deliveryPolicy, allowedModules: ['modelCatalog'] },
+      }),
+    ).toThrow(/exceed current target/u);
+    for (const patch of [
+      { checkerVersion: '99.0.0' },
+      { ownershipPolicyVersion: 99 },
+      { ownershipPolicyDigest: 'f'.repeat(64) },
+    ])
+      expect(() =>
+        validateTarget(outDir, {
+          ...target,
+          deliveryPolicy: {
+            ...target.deliveryPolicy,
+            allowedPruningRules: [{ ...target.deliveryPolicy.allowedPruningRules[0]!, ...patch }],
+          },
+        }),
+      ).toThrow(/not allowed/u);
+    expect(() =>
+      validateTarget(outDir, {
+        ...target,
+        deliveryPolicy: { ...target.deliveryPolicy, profileId: 'another-enterprise' },
+      }),
+    ).toThrow(/Delivery policy profile\/environment/u);
+  });
+
+  it('strictly parses target policies without silently accepting unknown fields or modules', () => {
+    expect(parseDeliveryPolicy(target.deliveryPolicy)).toEqual(target.deliveryPolicy);
+    for (const patch of [
+      { extra: true },
+      { allowedModules: [] },
+      { allowedModules: ['unknown'] },
+      { allowedModules: ['chat', 'chat'] },
+      { minReleaseSchemaVersion: 1 },
+      { allowedPruningRules: [] },
+      {
+        allowedPruningRules: [
+          { ...target.deliveryPolicy.allowedPruningRules[0], ownershipPolicyDigest: 'bad' },
+        ],
+      },
+      { allowedPruningRules: [{ ...target.deliveryPolicy.allowedPruningRules[0], extra: true }] },
+    ])
+      expect(() => parseDeliveryPolicy({ ...target.deliveryPolicy, ...patch })).toThrow();
+  });
+
+  it('refuses to create V2 success metadata when its pruning proof does not match the files', () => {
+    const { root, outDir, record } = fixture();
+    if (record.schemaVersion !== 2) throw new Error('Expected a V2 fixture');
+    writeFileSync(join(outDir, 'index.html'), 'changed after pruning');
+    expect(() =>
+      writeReleaseRecord({
+        rootDir: root,
+        outDir,
+        profile,
+        mode: 'production',
+        buildId: record.buildId,
+        gitCommit: 'a'.repeat(40),
+        backendCompatibility: compatibility,
+        pruning: record.pruning,
+      }),
+    ).toThrow(/Pruning files changed/u);
+  });
+
   it('records a complete deterministic inventory and only explicit public metadata', () => {
     const { outDir, record } = fixture();
     expect(validateTarget(outDir, target)).toEqual(record);
@@ -128,6 +247,7 @@ describe('release records and target verification', () => {
       profile,
       mode: 'production',
       buildId: 'source-unchanged',
+      pruning: writeFixturePruningReport(outDir, profile, 'production', 'source-unchanged'),
       gitCommit: 'a'.repeat(40),
       backendCompatibility: compatibility,
     });
@@ -140,6 +260,7 @@ describe('release records and target verification', () => {
       profile,
       mode: 'production',
       buildId: 'source-changed',
+      pruning: writeFixturePruningReport(outDir, profile, 'production', 'source-changed'),
       gitCommit: 'a'.repeat(40),
       backendCompatibility: compatibility,
     });
@@ -222,6 +343,7 @@ describe('release records and target verification', () => {
     expect(() =>
       validateTarget(outDir, {
         ...target,
+        deliveryPolicy: { ...target.deliveryPolicy, profileId: 'enterprise-b' },
         backendPolicy: { ...target.backendPolicy, profileId: 'enterprise-b' },
       }),
     ).toThrow(/policy profile\/environment/u);
@@ -229,6 +351,46 @@ describe('release records and target verification', () => {
 });
 
 describe('local archive, deployment, and rollback', () => {
+  it('withdraws noncompliant historical URLs on module shrink while keeping private evidence', () => {
+    const first = fixture('release-wide', 'wide');
+    const narrowed: BuildProfile = { ...profile, modules: { ...profile.modules, chat: false } };
+    const second = fixture('release-narrow', 'narrow', narrowed);
+    deployRelease(first.outDir, first.destination, target);
+    mkdirSync(join(first.destination, 'assets'));
+    writeFileSync(
+      join(first.destination, 'assets', 'legacy-12345678.js'),
+      'old unverified evidence',
+    );
+    const narrowTarget: ReleaseTarget = {
+      ...target,
+      deliveryPolicy: { ...target.deliveryPolicy, allowedModules: ['modelCatalog'] },
+    };
+    deployRelease(second.outDir, first.destination, narrowTarget);
+    expect(existsSync(join(first.destination, 'current', 'assets', first.assetName))).toBe(false);
+    expect(existsSync(join(first.destination, 'current', 'assets', second.assetName))).toBe(true);
+    expect(
+      existsSync(
+        join(first.destination, 'archives', first.record.buildId, first.record.artifacts[0]!.path),
+      ),
+    ).toBe(true);
+    expect(readFileSync(join(first.destination, 'assets', 'legacy-12345678.js'), 'utf8')).toBe(
+      'old unverified evidence',
+    );
+    const inventory = JSON.parse(
+      readFileSync(join(first.destination, 'current', '.public-inventory.json'), 'utf8'),
+    );
+    expect(inventory.eligibleBuildIds).toEqual(['release-narrow']);
+    expect(inventory.excludedBuildIds).toEqual(['release-wide']);
+    expect(() => rollbackRelease(first.record.buildId, first.destination, narrowTarget)).toThrow(
+      /exceed current target/u,
+    );
+    expect(
+      JSON.parse(
+        readFileSync(join(first.destination, 'current', 'site', RELEASE_RECORD_FILE), 'utf8'),
+      ).buildId,
+    ).toBe('release-narrow');
+  });
+
   it('archives verified bytes before deployment and rejects reusing an ID for different bytes', () => {
     const first = fixture();
     const archive = archiveRelease(first.outDir, first.destination, target);
@@ -244,23 +406,37 @@ describe('local archive, deployment, and rollback', () => {
     const first = fixture('release-one', 'one');
     const second = fixture('release-two', 'two');
     deployRelease(first.outDir, first.destination, target);
-    expect(readlinkSync(join(first.destination, 'current'))).toBe('releases/release-one');
+    expect(readlinkSync(join(first.destination, 'current'))).toMatch(/^public-generations\//u);
+    expect(
+      JSON.parse(
+        readFileSync(join(first.destination, 'current', 'site', RELEASE_RECORD_FILE), 'utf8'),
+      ).buildId,
+    ).toBe('release-one');
     deployRelease(second.outDir, first.destination, target);
-    expect(readlinkSync(join(first.destination, 'current'))).toBe('releases/release-two');
+    expect(
+      JSON.parse(
+        readFileSync(join(first.destination, 'current', 'site', RELEASE_RECORD_FILE), 'utf8'),
+      ).buildId,
+    ).toBe('release-two');
     for (const artifact of [first, second]) {
-      expect(readFileSync(join(first.destination, 'assets', artifact.assetName), 'utf8')).toBe(
-        readFileSync(join(artifact.outDir, 'assets', artifact.assetName), 'utf8'),
-      );
+      expect(
+        readFileSync(join(first.destination, 'current', 'assets', artifact.assetName), 'utf8'),
+      ).toBe(readFileSync(join(artifact.outDir, 'assets', artifact.assetName), 'utf8'));
     }
     // Current config/source are irrelevant to rollback: archived profile/bytes are authoritative.
     rmSync(first.outDir, { recursive: true });
     writeFileSync(join(first.root, 'package.json'), JSON.stringify({ version: '99.0.0' }));
     rollbackRelease('release-one', first.destination, target);
-    expect(readlinkSync(join(first.destination, 'current'))).toBe('releases/release-one');
+    expect(readlinkSync(join(first.destination, 'current'))).toMatch(/^public-generations\//u);
+    expect(
+      JSON.parse(
+        readFileSync(join(first.destination, 'current', 'site', RELEASE_RECORD_FILE), 'utf8'),
+      ).buildId,
+    ).toBe('release-one');
     expect(
       validateTarget(join(first.destination, 'releases', 'release-one'), target).appVersion,
     ).toBe('1.0.0');
-    expect(existsSync(join(first.destination, 'assets', second.assetName))).toBe(true);
+    expect(existsSync(join(first.destination, 'current', 'assets', second.assetName))).toBe(true);
   });
 
   it('refuses tampered archives and incompatible rollback without changing the active release', () => {
@@ -277,7 +453,11 @@ describe('local archive, deployment, and rollback', () => {
     );
     writeFileSync(join(first.destination, 'archives', 'release-one', 'index.html'), 'tampered');
     expect(() => rollbackRelease('release-one', first.destination, target)).toThrow(/integrity/u);
-    expect(readlinkSync(join(first.destination, 'current'))).toBe('releases/release-two');
+    expect(
+      JSON.parse(
+        readFileSync(join(first.destination, 'current', 'site', RELEASE_RECORD_FILE), 'utf8'),
+      ).buildId,
+    ).toBe('release-two');
   });
 
   it('rejects a different enterprise target and never overwrites unrelated directories', () => {
@@ -286,6 +466,7 @@ describe('local archive, deployment, and rollback', () => {
     const mismatched = {
       ...target,
       profileId: 'enterprise-b',
+      deliveryPolicy: { ...target.deliveryPolicy, profileId: 'enterprise-b' },
       backendPolicy: { ...target.backendPolicy, profileId: 'enterprise-b' },
     };
     expect(() => rollbackRelease('release-one', first.destination, mismatched)).toThrow(
@@ -308,13 +489,17 @@ describe('local archive, deployment, and rollback', () => {
 
   it('refuses a retained asset collision and keeps the previous release active', () => {
     const first = fixture();
-    const second = fixture('release-two', 'two');
+    const second = fixture('release-two', 'two', profile, first.assetName);
     deployRelease(first.outDir, first.destination, target);
-    writeFileSync(join(first.destination, 'assets', second.assetName), 'untrusted collision');
     expect(() => deployRelease(second.outDir, first.destination, target)).toThrow(
       /collision or tampering/u,
     );
-    expect(readlinkSync(join(first.destination, 'current'))).toBe('releases/release-one');
+    expect(readlinkSync(join(first.destination, 'current'))).toMatch(/^public-generations\//u);
+    expect(
+      JSON.parse(
+        readFileSync(join(first.destination, 'current', 'site', RELEASE_RECORD_FILE), 'utf8'),
+      ).buildId,
+    ).toBe('release-one');
   });
 
   it('resolves symlink ancestors before creating any target files inside the source artifact', () => {
@@ -339,8 +524,7 @@ describe('local archive, deployment, and rollback', () => {
       /unexpected current/u,
     );
     rmSync(join(first.destination, 'current'), { recursive: true });
-    rmSync(join(first.destination, 'assets'), { recursive: true });
-    symlinkSync(first.root, join(first.destination, 'assets'));
+    symlinkSync(first.root, join(first.destination, 'public-generations'));
     expect(() => deployRelease(first.outDir, first.destination, target)).toThrow(/symbolic link/u);
   });
 

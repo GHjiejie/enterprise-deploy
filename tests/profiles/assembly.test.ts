@@ -6,7 +6,7 @@ import {
   getEnabledModules,
   moduleRegistry,
   validateModuleAssembly,
-} from '../../src/app/module-registry.ts';
+} from '../../build/module-catalog.ts';
 import { getNavigation } from '../../src/app/navigation.ts';
 import { resolveAppRoute } from '../../src/app/router.ts';
 import { activateModules } from '../../src/platform/module-lifecycle.ts';
@@ -16,6 +16,14 @@ import {
   resolveModuleLink,
 } from '../../src/platform/navigation-service.ts';
 import { canViewModule, DEMO_ACCESS } from '../../src/platform/permissions.ts';
+
+vi.mock('../../src/app/active-modules.ts', () => ({
+  activeModuleIds: ['modelCatalog', 'chat'],
+  pageLoaders: {
+    modelCatalog: () => Promise.resolve({ default: () => null }),
+    chat: () => Promise.resolve({ default: () => null }),
+  },
+}));
 
 const enterpriseA = loadBuildProfile('enterprise-a');
 const enterpriseB = loadBuildProfile('enterprise-b');
@@ -44,7 +52,7 @@ function changeModule(
 }
 
 describe('module assembly validation', () => {
-  it.each(['standard', 'enterprise-a', 'enterprise-b'])(
+  it.each(['standard', 'enterprise-a', 'enterprise-b', 'qianshi'])(
     'validates the supported %s profile',
     (id) => {
       expect(() => validateModuleAssembly(loadBuildProfile(id))).not.toThrow();
@@ -146,7 +154,9 @@ describe('route guard before page loading', () => {
     '/video-studio',
     '/video-studio/tasks/task-1',
   ])('never resolves the disabled %s route, including for an administrator', (path) => {
-    expect(resolveAppRoute(path, enterpriseA, DEMO_ACCESS.admin)).toEqual({ kind: 'not-found' });
+    expect(resolveAppRoute(path, enterpriseA, DEMO_ACCESS.admin, moduleRegistry)).toEqual({
+      kind: 'not-found',
+    });
   });
 
   it.each([
@@ -155,7 +165,7 @@ describe('route guard before page loading', () => {
     ['/playground/image', 'imageStudio', 'imageStudio.index'],
     ['/playground/video', 'videoStudio', 'videoStudio.index'],
   ])('resolves an enabled canonical route %s', (path, moduleId, routeName) => {
-    expect(resolveAppRoute(path, enterpriseB, DEMO_ACCESS.member)).toEqual({
+    expect(resolveAppRoute(path, enterpriseB, DEMO_ACCESS.member, moduleRegistry)).toEqual({
       kind: 'page',
       moduleId,
       routeName,
@@ -169,6 +179,7 @@ describe('route guard before page loading', () => {
         `/playground/${type}/tasks/task-42?tab=result#preview`,
         enterpriseB,
         DEMO_ACCESS.member,
+        moduleRegistry,
       ),
     ).toEqual({
       kind: 'page',
@@ -180,10 +191,20 @@ describe('route guard before page loading', () => {
 
   it('preserves encoded detail IDs when normalizing legacy links', () => {
     expect(
-      resolveAppRoute('/image-studio/tasks/a%20b%2Fc', enterpriseB, DEMO_ACCESS.member),
+      resolveAppRoute(
+        '/image-studio/tasks/a%20b%2Fc',
+        enterpriseB,
+        DEMO_ACCESS.member,
+        moduleRegistry,
+      ),
     ).toEqual({ kind: 'redirect', to: '/playground/image/tasks/a%20b%2Fc' });
     expect(
-      resolveAppRoute('/playground/image/tasks/a%20b%2Fc', enterpriseB, DEMO_ACCESS.member),
+      resolveAppRoute(
+        '/playground/image/tasks/a%20b%2Fc',
+        enterpriseB,
+        DEMO_ACCESS.member,
+        moduleRegistry,
+      ),
     ).toEqual({
       kind: 'page',
       moduleId: 'imageStudio',
@@ -191,7 +212,12 @@ describe('route guard before page loading', () => {
       params: { taskId: 'a b/c' },
     });
     expect(
-      resolveAppRoute('/playground/image/tasks/%invalid', enterpriseB, DEMO_ACCESS.member),
+      resolveAppRoute(
+        '/playground/image/tasks/%invalid',
+        enterpriseB,
+        DEMO_ACCESS.member,
+        moduleRegistry,
+      ),
     ).toEqual({ kind: 'not-found' });
   });
 
@@ -203,7 +229,7 @@ describe('route guard before page loading', () => {
     ['/video-studio/tasks/123', '/playground/video/tasks/123'],
     ['/playground/chat', '/chat'],
   ])('redirects guarded legacy route %s to its canonical entry', (path, to) => {
-    expect(resolveAppRoute(path, enterpriseB, DEMO_ACCESS.member)).toEqual({
+    expect(resolveAppRoute(path, enterpriseB, DEMO_ACCESS.member, moduleRegistry)).toEqual({
       kind: 'redirect',
       to,
     });
@@ -219,38 +245,48 @@ describe('route guard before page loading', () => {
     '//external.test/models',
     'https://external.test/models',
   ])('does not use prefix matching or an unguarded generic fallback for %s', (path) => {
-    expect(resolveAppRoute(path, enterpriseB, DEMO_ACCESS.admin)).toEqual({ kind: 'not-found' });
+    expect(resolveAppRoute(path, enterpriseB, DEMO_ACCESS.admin, moduleRegistry)).toEqual({
+      kind: 'not-found',
+    });
   });
 
   it('separates anonymous and forbidden enabled routes from disabled routes', () => {
-    expect(resolveAppRoute('/chat', enterpriseA, DEMO_ACCESS.anonymous)).toEqual({
+    expect(resolveAppRoute('/chat', enterpriseA, DEMO_ACCESS.anonymous, moduleRegistry)).toEqual({
       kind: 'unauthenticated',
     });
-    expect(resolveAppRoute('/models', enterpriseB, DEMO_ACCESS.chatOnly)).toEqual({
+    expect(resolveAppRoute('/models', enterpriseB, DEMO_ACCESS.chatOnly, moduleRegistry)).toEqual({
       kind: 'forbidden',
     });
-    expect(resolveAppRoute('/image-studio/tasks/1', enterpriseB, DEMO_ACCESS.chatOnly)).toEqual({
+    expect(
+      resolveAppRoute('/image-studio/tasks/1', enterpriseB, DEMO_ACCESS.chatOnly, moduleRegistry),
+    ).toEqual({
       kind: 'forbidden',
     });
-    expect(resolveAppRoute('/playground/chat', enterpriseB, DEMO_ACCESS.noAccess)).toEqual({
+    expect(
+      resolveAppRoute('/playground/chat', enterpriseB, DEMO_ACCESS.noAccess, moduleRegistry),
+    ).toEqual({
       kind: 'forbidden',
     });
-    expect(resolveAppRoute('/image-studio', enterpriseA, DEMO_ACCESS.anonymous)).toEqual({
+    expect(
+      resolveAppRoute('/image-studio', enterpriseA, DEMO_ACCESS.anonymous, moduleRegistry),
+    ).toEqual({
       kind: 'not-found',
     });
   });
 
   it('selects the configured default then an enabled entry permitted to the current user', () => {
-    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.admin)).toEqual({
+    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.admin, moduleRegistry)).toEqual({
       kind: 'redirect',
       to: '/models',
     });
-    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.chatOnly)).toEqual({
+    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.chatOnly, moduleRegistry)).toEqual({
       kind: 'redirect',
       to: '/chat',
     });
-    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.noAccess)).toEqual({ kind: 'no-access' });
-    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.anonymous)).toEqual({
+    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.noAccess, moduleRegistry)).toEqual({
+      kind: 'no-access',
+    });
+    expect(resolveAppRoute('/', enterpriseA, DEMO_ACCESS.anonymous, moduleRegistry)).toEqual({
       kind: 'unauthenticated',
     });
   });
@@ -260,6 +296,7 @@ describe('route guard before page loading', () => {
     if (!catalog) throw new Error('Missing test module');
     const menuLess: ModuleDefinition = {
       id: catalog.id,
+      display: catalog.display,
       routes: catalog.routes,
       entryRouteName: catalog.entryRouteName,
       viewPermission: catalog.viewPermission,
@@ -283,19 +320,27 @@ describe('route guard before page loading', () => {
 describe('navigation and all other entry points use the same module gate', () => {
   it('removes unavailable entries and empty groups', () => {
     expect(
-      getNavigation(enterpriseA, DEMO_ACCESS.admin)
+      getNavigation(enterpriseA, DEMO_ACCESS.admin, moduleRegistry)
         .flatMap((group) => group.items)
         .map((item) => item.moduleId),
     ).toEqual(['modelCatalog', 'chat']);
-    expect(getNavigation(enterpriseB, DEMO_ACCESS.chatOnly)).toEqual([
+    expect(getNavigation(enterpriseB, DEMO_ACCESS.chatOnly, moduleRegistry)).toEqual([
       {
         id: '在线体验',
         label: '在线体验',
-        items: [{ moduleId: 'chat', label: '智能对话', href: '/chat', routeName: 'chat.index' }],
+        items: [
+          {
+            moduleId: 'chat',
+            label: '智能对话',
+            icon: '◌',
+            href: '/chat',
+            routeName: 'chat.index',
+          },
+        ],
       },
     ]);
-    expect(getNavigation(enterpriseB, DEMO_ACCESS.noAccess)).toEqual([]);
-    expect(getNavigation(enterpriseB, DEMO_ACCESS.anonymous)).toEqual([]);
+    expect(getNavigation(enterpriseB, DEMO_ACCESS.noAccess, moduleRegistry)).toEqual([]);
+    expect(getNavigation(enterpriseB, DEMO_ACCESS.anonymous, moduleRegistry)).toEqual([]);
   });
 
   it('keeps independently enabled video experiences available when image experience is disabled', () => {
@@ -304,27 +349,36 @@ describe('navigation and all other entry points use the same module gate', () =>
       modules: { ...enterpriseB.modules, imageStudio: false },
     };
     expect(() => validateModuleAssembly(videoOnly)).not.toThrow();
-    expect(getModuleHref('imageStudio', videoOnly, DEMO_ACCESS.admin)).toBeNull();
-    expect(getModuleHref('videoStudio', videoOnly, DEMO_ACCESS.admin)).toBe('/playground/video');
-    expect(resolveAppRoute('/playground/video/tasks/1', videoOnly, DEMO_ACCESS.admin).kind).toBe(
-      'page',
+    expect(getModuleHref('imageStudio', videoOnly, DEMO_ACCESS.admin, moduleRegistry)).toBeNull();
+    expect(getModuleHref('videoStudio', videoOnly, DEMO_ACCESS.admin, moduleRegistry)).toBe(
+      '/playground/video',
     );
+    expect(
+      resolveAppRoute('/playground/video/tasks/1', videoOnly, DEMO_ACCESS.admin, moduleRegistry)
+        .kind,
+    ).toBe('page');
   });
 
   it('provides explicit feedback for history and notification links', () => {
-    expect(resolveModuleLink('imageStudio', enterpriseA, DEMO_ACCESS.admin)).toMatchObject({
+    expect(
+      resolveModuleLink('imageStudio', enterpriseA, DEMO_ACCESS.admin, moduleRegistry),
+    ).toMatchObject({
       available: false,
       reason: 'disabled',
     });
-    expect(resolveModuleLink('chat', enterpriseA, DEMO_ACCESS.anonymous)).toMatchObject({
+    expect(
+      resolveModuleLink('chat', enterpriseA, DEMO_ACCESS.anonymous, moduleRegistry),
+    ).toMatchObject({
       available: false,
       reason: 'unauthenticated',
     });
-    expect(resolveModuleLink('imageStudio', enterpriseB, DEMO_ACCESS.chatOnly)).toMatchObject({
+    expect(
+      resolveModuleLink('imageStudio', enterpriseB, DEMO_ACCESS.chatOnly, moduleRegistry),
+    ).toMatchObject({
       available: false,
       reason: 'forbidden',
     });
-    expect(resolveModuleLink('chat', enterpriseA, DEMO_ACCESS.chatOnly)).toEqual({
+    expect(resolveModuleLink('chat', enterpriseA, DEMO_ACCESS.chatOnly, moduleRegistry)).toEqual({
       available: true,
       href: '/chat',
     });
@@ -336,7 +390,9 @@ describe('navigation and all other entry points use the same module gate', () =>
       { moduleId: 'imageStudio' as const, model: 'image-model' },
       { moduleId: 'videoStudio' as const, model: 'video-model' },
     ];
-    expect(filterModuleLinks(links, enterpriseA, DEMO_ACCESS.admin)).toEqual([links[0]]);
+    expect(filterModuleLinks(links, enterpriseA, DEMO_ACCESS.admin, moduleRegistry)).toEqual([
+      links[0],
+    ]);
     expect(links).toHaveLength(3);
   });
 
@@ -361,12 +417,17 @@ describe('explicit module lifecycle', () => {
     const chat = activate('chat');
     const imageStudio = activate('image');
     const videoStudio = activate('video');
-    const cleanup = await activateModules(enterpriseA, DEMO_ACCESS.admin, {
-      modelCatalog,
-      chat,
-      imageStudio,
-      videoStudio,
-    });
+    const cleanup = await activateModules(
+      enterpriseA,
+      DEMO_ACCESS.admin,
+      {
+        modelCatalog,
+        chat,
+        imageStudio,
+        videoStudio,
+      },
+      moduleRegistry,
+    );
     expect(events).toEqual(['start:models', 'start:chat']);
     expect(imageStudio).not.toHaveBeenCalled();
     expect(videoStudio).not.toHaveBeenCalled();
@@ -378,11 +439,16 @@ describe('explicit module lifecycle', () => {
   it('never activates unauthorized modules', async () => {
     const modelCatalog = vi.fn();
     const chat = vi.fn();
-    await activateModules(enterpriseB, DEMO_ACCESS.chatOnly, { modelCatalog, chat });
+    await activateModules(
+      enterpriseB,
+      DEMO_ACCESS.chatOnly,
+      { modelCatalog, chat },
+      moduleRegistry,
+    );
     expect(modelCatalog).not.toHaveBeenCalled();
     expect(chat).toHaveBeenCalledOnce();
     chat.mockClear();
-    await activateModules(enterpriseB, DEMO_ACCESS.anonymous, { chat });
+    await activateModules(enterpriseB, DEMO_ACCESS.anonymous, { chat }, moduleRegistry);
     expect(chat).not.toHaveBeenCalled();
   });
 
@@ -390,33 +456,111 @@ describe('explicit module lifecycle', () => {
     const events: string[] = [];
     const error = new Error('Initialization failed');
     await expect(
-      activateModules(enterpriseB, DEMO_ACCESS.admin, {
-        modelCatalog: () => () => {
-          events.push('stop:models');
+      activateModules(
+        enterpriseB,
+        DEMO_ACCESS.admin,
+        {
+          modelCatalog: () => () => {
+            events.push('stop:models');
+          },
+          chat: () => () => {
+            events.push('stop:chat');
+          },
+          imageStudio: () => {
+            throw error;
+          },
+          videoStudio: () => {
+            events.push('start:video');
+          },
         },
-        chat: () => () => {
-          events.push('stop:chat');
-        },
-        imageStudio: () => {
-          throw error;
-        },
-        videoStudio: () => {
-          events.push('start:video');
-        },
-      }),
+        moduleRegistry,
+      ),
     ).rejects.toBe(error);
     expect(events).toEqual(['stop:chat', 'stop:models']);
   });
 
   it('continues cleaning remaining modules after a cleanup error', async () => {
     const cleanupModels = vi.fn();
-    const cleanup = await activateModules(enterpriseA, DEMO_ACCESS.admin, {
-      modelCatalog: () => cleanupModels,
-      chat: () => () => {
-        throw new Error('Cleanup failed');
+    const cleanup = await activateModules(
+      enterpriseA,
+      DEMO_ACCESS.admin,
+      {
+        modelCatalog: () => cleanupModels,
+        chat: () => () => {
+          throw new Error('Cleanup failed');
+        },
       },
-    });
+      moduleRegistry,
+    );
     await expect(cleanup()).rejects.toBeInstanceOf(AggregateError);
     expect(cleanupModels).toHaveBeenCalledOnce();
+  });
+});
+
+describe('physically selected application assembly', () => {
+  const videoRegistry = moduleRegistry.filter((module) => module.id === 'videoStudio');
+  const modifiedFlags = { ...enterpriseB, id: 'qianshi', defaultModule: 'videoStudio' as const };
+
+  it('does not restore omitted routes or links when disabled flags become true', () => {
+    for (const path of [
+      '/chat',
+      '/models',
+      '/playground/image',
+      '/image-studio/tasks/1',
+      '/playground/chat',
+    ]) {
+      expect(resolveAppRoute(path, modifiedFlags, DEMO_ACCESS.admin, videoRegistry)).toEqual({
+        kind: 'not-found',
+      });
+    }
+    expect(resolveAppRoute('/', modifiedFlags, DEMO_ACCESS.admin, videoRegistry)).toEqual({
+      kind: 'redirect',
+      to: '/playground/video',
+    });
+    expect(
+      resolveModuleLink('chat', modifiedFlags, DEMO_ACCESS.admin, videoRegistry),
+    ).toMatchObject({ available: false, reason: 'missing-entry' });
+    expect(
+      getNavigation(modifiedFlags, DEMO_ACCESS.admin, videoRegistry).flatMap((group) =>
+        group.items.map((item) => item.moduleId),
+      ),
+    ).toEqual(['videoStudio']);
+  });
+
+  it('cannot activate omitted modules even if callers supply their activators', async () => {
+    const chat = vi.fn();
+    const imageStudio = vi.fn();
+    const videoStudio = vi.fn();
+    await activateModules(
+      modifiedFlags,
+      DEMO_ACCESS.admin,
+      { chat, imageStudio, videoStudio },
+      videoRegistry,
+    );
+    expect(chat).not.toHaveBeenCalled();
+    expect(imageStudio).not.toHaveBeenCalled();
+    expect(videoStudio).toHaveBeenCalledOnce();
+  });
+
+  it('requires standalone display metadata even for modules without navigation', () => {
+    expect(() =>
+      validateModuleAssembly(
+        enterpriseB,
+        changeModule('chat', { display: { title: '', icon: '◌' } }),
+      ),
+    ).toThrow(/展示信息/);
+  });
+
+  it('requires an active page loader in addition to a true profile flag', async () => {
+    vi.resetModules();
+    vi.stubGlobal('__BUILD_PROFILE__', enterpriseB);
+    try {
+      const features = await import('../../src/platform/features.ts');
+      expect(features.buildProfile.modules.imageStudio).toBe(true);
+      expect(features.isModuleEnabled('imageStudio')).toBe(false);
+      expect(features.isModuleEnabled('chat')).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

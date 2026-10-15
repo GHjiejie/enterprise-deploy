@@ -1,7 +1,8 @@
-import { createReadStream, lstatSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
-import { canonicalJson, parseReleaseRecord, scanArtifacts } from './release-record.ts';
+import { canonicalJson, sha256, RELEASE_RECORD_FILE } from './release-record.ts';
+import { verifyConsoleArtifact } from './console-artifact.ts';
+import { readConsoleFile, PACKAGE_LIMITS } from './console-package.ts';
 
 const contentTypes: Readonly<Record<string, string>> = {
   html: 'text/html; charset=utf-8',
@@ -25,15 +26,10 @@ export interface ConsolePreview {
 }
 
 export async function createConsolePreview(siteDirectory: string): Promise<ConsolePreview> {
-  const record = parseReleaseRecord(
-    JSON.parse(readFileSync(join(siteDirectory, 'release-record.json'), 'utf8')),
+  const { record } = verifyConsoleArtifact(siteDirectory);
+  const recordSha256 = sha256(
+    readConsoleFile(join(siteDirectory, RELEASE_RECORD_FILE), PACKAGE_LIMITS.fileBytes),
   );
-  if (
-    canonicalJson(scanArtifacts(siteDirectory)) !==
-    canonicalJson({ artifacts: record.artifacts, directories: record.directories })
-  ) {
-    throw new Error('构建产物完整性校验失败，无法预览');
-  }
   const allowedFiles = new Set([
     ...record.artifacts.map((file) => file.path),
     'release-record.json',
@@ -74,23 +70,29 @@ export async function createConsolePreview(siteDirectory: string): Promise<Conso
       return;
     }
     try {
-      const stat = lstatSync(join(siteDirectory, file));
-      if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Invalid file');
+      const current = verifyConsoleArtifact(siteDirectory);
+      if (canonicalJson(current.record) !== canonicalJson(record))
+        throw new Error('固定构建快照已变化');
+      const bytes = readConsoleFile(join(siteDirectory, file), PACKAGE_LIMITS.fileBytes);
+      const expected =
+        file === RELEASE_RECORD_FILE
+          ? recordSha256
+          : record.artifacts.find((entry) => entry.path === file)?.sha256;
+      if (!expected || sha256(bytes) !== expected) throw new Error('固定构建文件已变化');
       response.writeHead(200, {
         'Content-Type': contentTypes[file.split('.').at(-1) ?? ''] ?? 'application/octet-stream',
-        'Content-Length': stat.size,
+        'Content-Length': bytes.length,
         'Cache-Control': file.startsWith('assets/')
           ? 'public, max-age=31536000, immutable'
           : 'no-cache',
         'X-Content-Type-Options': 'nosniff',
       });
       if (request.method === 'HEAD') response.end();
-      else
-        createReadStream(join(siteDirectory, file))
-          .on('error', () => response.destroy())
-          .pipe(response);
+      else response.end(bytes);
     } catch {
-      response.writeHead(404).end();
+      response
+        .writeHead(409, { 'Cache-Control': 'no-store' })
+        .end('固定构建快照验证失败，请重新构建');
     }
   });
   await new Promise<void>((resolve, reject) => {

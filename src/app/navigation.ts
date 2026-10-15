@@ -1,12 +1,13 @@
 import type { BuildProfile, ModuleId } from '../../shared/build-profile.ts';
 import type { ModuleDefinition } from '../../shared/module-definition.ts';
-import { getEnabledModules, moduleRegistry } from './module-registry.ts';
+import { getEnabledModules } from '../../shared/module-assembly.ts';
 import { getModuleHref } from '../platform/navigation-service.ts';
 import type { UserAccess } from '../platform/permissions.ts';
 
 export interface NavigationItem {
   readonly moduleId: ModuleId;
   readonly label: string;
+  readonly icon: string;
   readonly href: string;
   readonly routeName: string;
 }
@@ -20,7 +21,7 @@ export interface NavigationGroup {
 export function getNavigation(
   profile: BuildProfile,
   access: UserAccess,
-  registry: readonly ModuleDefinition[] = moduleRegistry,
+  registry: readonly ModuleDefinition[],
 ): NavigationGroup[] {
   const groups = new Map<string, NavigationItem[]>();
   const sortedModules = [...getEnabledModules(profile, registry)].sort(
@@ -34,6 +35,7 @@ export function getNavigation(
     items.push({
       moduleId: module.id,
       label: navigation.label,
+      icon: module.display.icon,
       href,
       routeName: module.entryRouteName,
     });

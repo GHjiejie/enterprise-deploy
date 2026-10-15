@@ -1,4 +1,4 @@
-import type { ModuleId } from '../../shared/build-profile.ts';
+import type { ModuleId } from '../../../shared/build-profile.ts';
 
 export interface CatalogModel {
   readonly id: string;
@@ -36,10 +36,3 @@ export const catalogModels: readonly CatalogModel[] = [
     tags: ['文生视频', 'API 模型'],
   },
 ];
-
-export const moduleLabels: Record<ModuleId, string> = {
-  modelCatalog: '模型广场',
-  chat: '智能对话',
-  imageStudio: '图片生成',
-  videoStudio: '视频生成',
-};

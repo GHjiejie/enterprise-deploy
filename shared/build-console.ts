@@ -31,13 +31,36 @@ export interface BuildResult {
   readonly previewUrl: string;
   readonly downloadUrl: string;
   readonly packageName: string;
+  readonly pruning: {
+    readonly status: 'passed';
+    readonly checkerVersion: string;
+    readonly enabledModules: readonly ModuleId[];
+    readonly excludedModules: readonly ModuleId[];
+    readonly reportDownloadUrl: string;
+  };
 }
+
+export const BUILD_STAGES = [
+  'queued',
+  'building',
+  'validating',
+  'compiling',
+  'pruning',
+  'verifying',
+  'snapshotting',
+  'packaging',
+  'package-verifying',
+  'complete',
+  'failed',
+] as const;
+export type BuildStage = (typeof BUILD_STAGES)[number];
 
 export interface BuildJob {
   readonly id: string;
   readonly profile: BuildProfile;
   readonly mode: ReleaseMode;
   readonly status: 'queued' | 'running' | 'succeeded' | 'failed';
+  readonly stage: BuildStage;
   readonly startedAt: string | null;
   readonly finishedAt: string | null;
   readonly log: string;

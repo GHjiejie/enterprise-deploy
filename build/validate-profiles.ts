@@ -2,7 +2,7 @@ import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { BuildProfile } from '../shared/build-profile.ts';
-import { validateModuleAssembly } from '../src/app/module-registry.ts';
+import { validateModuleAssembly } from './module-catalog.ts';
 import { loadBuildProfile, resolveProfilesDirectory } from './load-profile.ts';
 
 /** Every checked-in JSON profile is a supported delivery configuration. */

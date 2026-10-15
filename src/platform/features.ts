@@ -1,3 +1,4 @@
+import { activeModuleIds, pageLoaders } from '../app/active-modules.ts';
 import type { BuildProfile, ModuleId } from '../../shared/build-profile.ts';
 
 declare const __BUILD_PROFILE__: BuildProfile;
@@ -10,5 +11,9 @@ export const buildProfile: BuildProfile = Object.freeze({
 });
 
 export function isModuleEnabled(moduleId: ModuleId): boolean {
-  return buildProfile.modules[moduleId] === true;
+  return (
+    buildProfile.modules[moduleId] === true &&
+    activeModuleIds.includes(moduleId) &&
+    typeof pageLoaders[moduleId] === 'function'
+  );
 }

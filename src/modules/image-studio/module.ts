@@ -2,6 +2,7 @@ import type { ModuleDefinition } from '../../../shared/module-definition.ts';
 
 export const imageStudioModule = {
   id: 'imageStudio',
+  display: { title: '图片生成', icon: '▧' },
   entryRouteName: 'imageStudio.index',
   viewPermission: 'imageStudio.view',
   dependsOn: [],

@@ -5,6 +5,9 @@ import { expect, test } from '@playwright/test';
 import { parseReleaseRecord } from '../../build/release-record.ts';
 import type { BuildProfile } from '../../shared/build-profile.ts';
 import type { ConsoleBootstrap, StartBuildResponse } from '../../shared/build-console.ts';
+import { verifyConsolePackage } from '../../build/console-package.ts';
+import { verifyConsoleArtifact } from '../../build/console-artifact.ts';
+import { parsePruningReport } from '../../build/pruning.ts';
 
 const profileId = process.env.CONSOLE_E2E_PROFILE_ID;
 const directory = process.env.CONSOLE_E2E_DIRECTORY;
@@ -136,6 +139,49 @@ test('外部修改造成版本冲突时保留草稿，显式重新加载后恢�
   await expect(page.getByRole('button', { name: '保存配置', exact: true })).toBeEnabled();
 });
 
+test('裁剪失败显示对应错误与日志并保留配置，不提供成功制品入口', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('__new__');
+  await page.getByRole('textbox', { name: /^企业标识/ }).fill('fixture-pruning-failure');
+  await page.getByRole('checkbox', { name: '视频生成', exact: true }).check();
+  await page.getByRole('combobox', { name: /^默认页面/ }).selectOption('videoStudio');
+  await page.route('**/api/builds', async (route) => {
+    const submitted = route.request().postDataJSON() as {
+      profile: BuildProfile;
+      mode: 'production';
+    };
+    const job = {
+      id: 'fixture-pruning-failure',
+      profile: submitted.profile,
+      mode: submitted.mode,
+      status: 'failed',
+      stage: 'failed',
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      log: 'Physical pruning: forbidden imageStudio dependency in videoStudio\\n',
+      error: '裁剪检查失败：videoStudio 引用了禁用的 imageStudio 模块。',
+      result: null,
+    };
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        entry: { profile: submitted.profile, revision: 'c'.repeat(64) },
+        job,
+      }),
+    });
+  });
+  await page.getByRole('button', { name: '保存并构建', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('构建失败');
+  await expect(page.getByRole('alert')).toContainText('videoStudio 引用了禁用的 imageStudio');
+  await expect(page.getByTestId('build-log')).toContainText('forbidden imageStudio dependency');
+  await expect(page.getByRole('checkbox', { name: '视频生成', exact: true })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: /^默认页面/ })).toHaveValue('videoStudio');
+  await expect(page.getByRole('button', { name: '保存并构建', exact: true })).toBeEnabled();
+  await expect(page.getByTestId('build-result')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '下载交付包', exact: true })).toHaveCount(0);
+});
+
 test('可视化新建配置、一键真实构建、预览与下载均对应本次配置快照', async ({
   page,
   context,
@@ -165,6 +211,18 @@ test('可视化新建配置、一键真实构建、预览与下载均对应本�
   });
   await expect(page.getByTestId('build-result')).toBeVisible({ timeout: 120_000 });
   await expect(page.getByTestId('build-log')).toContainText('vite');
+  await expect(page.getByTestId('pruning-status')).toContainText('校验通过');
+  await expect(page.getByText('图片生成、视频生成', { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('verified-build-desktop.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: testInfo.outputPath('verified-build-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   const previewOpened = context.waitForEvent('page');
   await page.getByRole('link', { name: '预览构建结果', exact: true }).click();
@@ -187,6 +245,7 @@ test('可视化新建配置、一键真实构建、预览与下载均对应本�
   );
   expect(recordResponse.ok()).toBe(true);
   const previewRecord = parseReleaseRecord(await recordResponse.json());
+  expect(previewRecord.schemaVersion).toBe(2);
   expect(previewRecord.profile).toEqual(entry.profile);
   expect(previewRecord.environment).toBe('production');
   expect(previewRecord.enabledModules).toEqual(['modelCatalog', 'chat']);
@@ -203,6 +262,7 @@ test('可视化新建配置、一键真实构建、预览与下载均对应本�
   expect(inventory).toContain('./index.html');
   expect(inventory).toContain('./assets/');
   expect(inventory).toContain('./release-record.json');
+  expect(inventory).toContain('./pruning-report.json');
   expect(inventory).not.toMatch(/config\/profiles|build-console/u);
   const packageRecord = parseReleaseRecord(
     JSON.parse(
@@ -212,6 +272,25 @@ test('可视化新建配置、一键真实构建、预览与下载均对应本�
   expect(packageRecord.profile).toEqual(entry.profile);
   expect(packageRecord.artifactDigest).toBe(previewRecord.artifactDigest);
   expect(packageRecord.buildId).toBe(previewRecord.buildId);
+  verifyConsolePackage(packagePath, (unpacked) => {
+    const artifact = verifyConsoleArtifact(unpacked);
+    expect(artifact.record.artifactDigest).toBe(previewRecord.artifactDigest);
+    expect(artifact.report.enabledModules).toEqual(['modelCatalog', 'chat']);
+    expect(artifact.report.excludedModules).toEqual(['imageStudio', 'videoStudio']);
+    expect(
+      artifact.report.files.every((file) =>
+        file.owners.every((owner) => owner !== 'imageStudio' && owner !== 'videoStudio'),
+      ),
+    ).toBe(true);
+  });
+  const reportDownloaded = page.waitForEvent('download');
+  await page.getByRole('link', { name: '下载裁剪报告', exact: true }).click();
+  const reportDownload = await reportDownloaded;
+  const reportPath = testInfo.outputPath(reportDownload.suggestedFilename());
+  await reportDownload.saveAs(reportPath);
+  const report = parsePruningReport(JSON.parse(readFileSync(reportPath, 'utf8')));
+  expect(report.buildId).toBe(packageRecord.buildId);
+  expect(report.excludedModules).toEqual(['imageStudio', 'videoStudio']);
   // Saving a later configuration must not change an already completed build.
   await page.getByRole('checkbox', { name: '图片生成', exact: true }).check();
   const saved = page.waitForResponse(
@@ -229,6 +308,13 @@ test('可视化新建配置、一键真实构建、预览与下载均对应本�
   expect(immutableRecord.profile.modules.imageStudio).toBe(false);
   expect(immutableRecord.artifactDigest).toBe(packageRecord.artifactDigest);
   expect(runtimeErrors).toEqual([]);
+  // Every later access must reject external edits, including an already started preview.
+  writeFileSync(resolve('dist/.console', job.id, 'site/index.html'), '<html>tampered later</html>');
+  expect((await page.request.get(`/api/builds/${job.id}/package`)).status()).toBe(500);
+  expect((await page.request.get(`/api/builds/${job.id}/pruning-report`)).status()).toBe(500);
+  expect((await preview.request.get(new URL('/index.html', preview.url()).href)).status()).toBe(
+    409,
+  );
 });
 
 test('配置页在窄屏仍可操作且无横向溢出', async ({ page }) => {

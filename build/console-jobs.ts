@@ -20,7 +20,9 @@ import { join, resolve } from 'node:path';
 import type { BuildProfile } from '../shared/build-profile.ts';
 import {
   RELEASE_MODES,
+  BUILD_STAGES,
   type BuildJob,
+  type BuildStage,
   type ProfileEntry,
   type ReleaseMode,
   type StartBuildResponse,
@@ -31,13 +33,14 @@ import {
   type ConsoleProfileStore,
   validateConsoleProfile,
 } from './console-store.ts';
+import { verifyConsoleArtifact } from './console-artifact.ts';
 import {
-  canonicalJson,
-  parseReleaseRecord,
-  RELEASE_RECORD_FILE,
-  scanArtifacts,
-  type ReleaseRecord,
-} from './release-record.ts';
+  readConsoleFile,
+  verifyConsolePackage,
+  writeConsolePackage,
+  PACKAGE_LIMITS,
+} from './console-package.ts';
+import { sha256 } from './release-record.ts';
 
 const MAX_LOG_CHARACTERS = 100_000;
 
@@ -49,6 +52,7 @@ export interface ConsoleBuildRun {
   readonly mode: ReleaseMode;
   readonly signal: AbortSignal;
   readonly onOutput: (text: string) => void;
+  readonly onStage?: (stage: BuildStage) => void;
 }
 
 export type ConsoleBuildRunner = (run: ConsoleBuildRun) => Promise<number>;
@@ -107,8 +111,9 @@ function runCommand(
   });
 }
 
-export const runConsoleBuild: ConsoleBuildRunner = (run) =>
-  runCommand('npm', ['run', 'build', '--', '--mode', run.mode], {
+export const runConsoleBuild: ConsoleBuildRunner = (run) => {
+  let pending = '';
+  return runCommand('npm', ['run', 'build', '--', '--mode', run.mode], {
     cwd: run.rootDir,
     signal: run.signal,
     env: {
@@ -117,14 +122,29 @@ export const runConsoleBuild: ConsoleBuildRunner = (run) =>
       APP_PROFILES_DIR: run.profilesDir,
       APP_BUILD_ID: run.jobId,
     },
-    onOutput: run.onOutput,
+    onOutput: (text) => {
+      run.onOutput(text);
+      pending += text;
+      const lines = pending.split(/\r?\n/u);
+      pending = (lines.pop() ?? '').slice(-1024);
+      for (const line of lines) {
+        const match = /^\[build-stage\] (validating|compiling|pruning)$/u.exec(line);
+        const stage = match?.[1];
+        if (stage && (BUILD_STAGES as readonly string[]).includes(stage))
+          run.onStage?.(stage as BuildStage);
+      }
+    },
   });
+};
 
 type MutableJob = { -readonly [Key in keyof BuildJob]: BuildJob[Key] };
 
 export interface ConsoleJobArtifact {
   readonly siteDirectory: string;
   readonly packagePath: string;
+  readonly packageSha256: string;
+  readonly reportPath: string;
+  readonly reportSha256: string;
 }
 
 export interface ConsoleJobManager {
@@ -134,6 +154,8 @@ export interface ConsoleJobManager {
   active(): BuildJob | null;
   get(id: string): BuildJob | null;
   getArtifact(id: string): ConsoleJobArtifact | null;
+  readPackage(id: string): Buffer | null;
+  readReport(id: string): Buffer | null;
   dispose(): Promise<void>;
 }
 
@@ -141,35 +163,6 @@ export interface ConsoleJobManagerOptions {
   readonly rootDir: string;
   readonly store: ConsoleProfileStore;
   readonly runner?: ConsoleBuildRunner;
-}
-
-function verifyArtifact(
-  directory: string,
-  profile: BuildProfile,
-  mode: ReleaseMode,
-  jobId: string,
-): ReleaseRecord {
-  assertRegularDirectory(directory);
-  const recordPath = join(directory, RELEASE_RECORD_FILE);
-  const stat = lstatSync(recordPath);
-  if (!stat.isFile() || stat.isSymbolicLink()) {
-    throw new Error('构建发布记录必须是普通文件');
-  }
-  const record = parseReleaseRecord(JSON.parse(readFileSync(recordPath, 'utf8')));
-  if (
-    record.buildId !== jobId ||
-    record.environment !== mode ||
-    canonicalJson(record.profile) !== canonicalJson(profile)
-  ) {
-    throw new Error('构建产物的企业配置或环境与当前任务不一致');
-  }
-  if (
-    canonicalJson(scanArtifacts(directory)) !==
-    canonicalJson({ artifacts: record.artifacts, directories: record.directories })
-  ) {
-    throw new Error('构建产物完整性校验失败');
-  }
-  return record;
 }
 
 export function createConsoleJobManager(options: ConsoleJobManagerOptions): ConsoleJobManager {
@@ -248,6 +241,7 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
     const jobDirectory = join(rootDir, 'dist/.console', job.id);
     try {
       job.status = 'running';
+      job.stage = 'building';
       job.startedAt = new Date().toISOString();
       const exit = await runner({
         jobId: job.id,
@@ -257,11 +251,16 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
         mode: job.mode,
         signal: abort.signal,
         onOutput: (text) => appendLog(job, text),
+        onStage: (stage) => {
+          job.stage = stage;
+        },
       });
       if (exit !== 0) throw new Error(`构建进程退出，状态码 ${exit}`);
       if (abort.signal.aborted) throw new Error('构建控制台已停止');
       const outDir = join(rootDir, 'dist', job.profile.id, job.mode);
-      const record = verifyArtifact(outDir, job.profile, job.mode, job.id);
+      const identity = { profile: job.profile, mode: job.mode, jobId: job.id };
+      job.stage = 'verifying';
+      const { record, report } = verifyConsoleArtifact(outDir, identity);
       const archiveRoot = join(rootDir, 'dist/.console');
       assertRegularDirectory(join(rootDir, 'dist'));
       mkdirSync(archiveRoot, { recursive: true });
@@ -269,17 +268,25 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
       mkdirSync(jobDirectory);
       assertRegularDirectory(jobDirectory);
       const siteDirectory = join(jobDirectory, 'site');
+      job.stage = 'snapshotting';
       cpSync(outDir, siteDirectory, { recursive: true, errorOnExist: true, force: false });
-      verifyArtifact(siteDirectory, job.profile, job.mode, job.id);
+      verifyConsoleArtifact(siteDirectory, identity);
       const packageName = `${job.profile.id}-${job.mode}-${record.buildId}.tar.gz`;
       const packagePath = join(jobDirectory, packageName);
-      const tarExit = await runCommand('tar', ['-czf', packagePath, '-C', siteDirectory, '.'], {
-        cwd: rootDir,
-        signal: abort.signal,
-        onOutput: (text) => appendLog(job, text),
+      job.stage = 'packaging';
+      writeConsolePackage(siteDirectory, packagePath, record);
+      job.stage = 'package-verifying';
+      const packageBytes = verifyConsolePackage(packagePath, (directory) => {
+        verifyConsoleArtifact(directory, identity);
       });
-      if (tarExit !== 0) throw new Error(`制品打包失败，状态码 ${tarExit}`);
-      artifacts.set(job.id, { siteDirectory, packagePath });
+      if (abort.signal.aborted) throw new Error('构建控制台已停止');
+      artifacts.set(job.id, {
+        siteDirectory,
+        packagePath,
+        packageSha256: sha256(packageBytes),
+        reportPath: join(siteDirectory, record.pruning.reportPath),
+        reportSha256: record.pruning.reportSha256,
+      });
       job.result = {
         outDir: `dist/${job.profile.id}/${job.mode}`,
         buildId: record.buildId,
@@ -287,10 +294,19 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
         previewUrl: `/api/builds/${job.id}/preview`,
         downloadUrl: `/api/builds/${job.id}/package`,
         packageName,
+        pruning: {
+          status: 'passed',
+          checkerVersion: report.checkerVersion,
+          enabledModules: report.enabledModules,
+          excludedModules: report.excludedModules,
+          reportDownloadUrl: `/api/builds/${job.id}/pruning-report`,
+        },
       };
       job.status = 'succeeded';
+      job.stage = 'complete';
     } catch (error) {
       job.status = 'failed';
+      job.stage = 'failed';
       job.error = error instanceof Error ? error.message : '构建失败';
       job.result = null;
       artifacts.delete(job.id);
@@ -334,6 +350,7 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
         profile,
         mode: mode as ReleaseMode,
         status: 'queued',
+        stage: 'queued',
         startedAt: null,
         finishedAt: null,
         log: '',
@@ -371,6 +388,29 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
     }
   }
 
+  function verifyStoredArtifact(
+    id: string,
+  ): { artifact: ConsoleJobArtifact; packageBytes: Buffer } | null {
+    const artifact = artifacts.get(id);
+    const job = jobs.get(id);
+    if (!artifact || !job || !job.result || job.status !== 'succeeded') return null;
+    const identity = { profile: job.profile, mode: job.mode, jobId: job.id };
+    const { record } = verifyConsoleArtifact(artifact.siteDirectory, identity);
+    if (
+      record.artifactDigest !== job.result.artifactDigest ||
+      record.pruning.reportSha256 !== artifact.reportSha256
+    ) {
+      throw new Error('固定构建快照已发生变化');
+    }
+    const packageBytes = verifyConsolePackage(artifact.packagePath, (directory) => {
+      const unpacked = verifyConsoleArtifact(directory, identity);
+      if (unpacked.record.artifactDigest !== job.result?.artifactDigest)
+        throw new Error('压缩包与固定快照不一致');
+    });
+    if (sha256(packageBytes) !== artifact.packageSha256) throw new Error('下载制品已发生变化');
+    return { artifact, packageBytes };
+  }
+
   return {
     assertIdle,
     save,
@@ -381,8 +421,16 @@ export function createConsoleJobManager(options: ConsoleJobManagerOptions): Cons
       return job ? copyJob(job) : null;
     },
     getArtifact: (id) => {
-      const artifact = artifacts.get(id);
+      const artifact = verifyStoredArtifact(id)?.artifact;
       return artifact ? { ...artifact } : null;
+    },
+    readPackage: (id) => verifyStoredArtifact(id)?.packageBytes ?? null,
+    readReport: (id) => {
+      const verified = verifyStoredArtifact(id);
+      if (!verified) return null;
+      const bytes = readConsoleFile(verified.artifact.reportPath, PACKAGE_LIMITS.fileBytes);
+      if (sha256(bytes) !== verified.artifact.reportSha256) throw new Error('裁剪报告已发生变化');
+      return bytes;
     },
     dispose,
   };
