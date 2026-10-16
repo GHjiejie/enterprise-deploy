@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "orders",
+      "entry": "src/modules/orders/index.ts",
+      "requires": [],
+      "conflicts": [],
+      "ownedRoots": ["src/modules/orders"]
+    },
+    {
+      "id": "reports",
+      "entry": "src/modules/reports/index.ts",
+      "requires": [],
+      "conflicts": [],
+      "ownedRoots": ["src/modules/reports"]
+    },
+    {
+      "id": "order-export",
+      "entry": "src/modules/order-export/index.ts",
+      "requires": ["orders"],
+      "conflicts": [],
+      "ownedRoots": ["src/modules/order-export"]
+    }
+  ],
+  "approvedPackages": [
+    "vue",
+    "@vue/shared",
+    "@vue/reactivity",
+    "@vue/runtime-core",
+    "@vue/runtime-dom",
+    "vue-router",
+    "nostics",
+    "@vue/devtools-api",
+    "@vue/devtools-kit",
+    "@vue/devtools-shared",
+    "birpc",
+    "hookable",
+    "perfect-debounce"
+  ]
+}

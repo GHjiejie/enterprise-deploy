@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "enterpriseId": "enterprise-a",
+  "enabledModules": ["orders", "reports", "order-export"],
+  "brandingId": "brand-a"
+}

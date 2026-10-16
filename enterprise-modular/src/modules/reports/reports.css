@@ -1,0 +1,13 @@
+.report-chart {
+  padding: 28px;
+}
+.report-chart img {
+  display: block;
+  width: 100%;
+  max-width: 920px;
+  margin: 36px auto 12px;
+}
+.report-footnote {
+  color: #8792a5;
+  font-size: 12px;
+}

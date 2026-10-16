@@ -8,3 +8,9 @@ coverage/
 docs/architecture.md
 .console-build.lock
 .vscode/
+enterprise-modular/.work/
+enterprise-modular/.audit/
+enterprise-modular/.artifacts/
+enterprise-modular/.deploy/
+enterprise-modular/.console/
+enterprise-modular/release/

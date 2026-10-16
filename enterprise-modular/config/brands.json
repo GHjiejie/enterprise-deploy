@@ -1,0 +1,12 @@
+{
+  "brand-a": {
+    "name": "企业 A",
+    "entry": "src/branding/brand-a/theme.css",
+    "ownedRoot": "src/branding/brand-a"
+  },
+  "brand-b": {
+    "name": "企业 B",
+    "entry": "src/branding/brand-b/theme.css",
+    "ownedRoot": "src/branding/brand-b"
+  }
+}

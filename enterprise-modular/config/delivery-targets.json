@@ -1,0 +1,12 @@
+{
+  "local-enterprise-a": {
+    "enterpriseId": "enterprise-a",
+    "allowedModules": ["orders", "reports", "order-export"],
+    "brandingId": "brand-a"
+  },
+  "local-enterprise-b": {
+    "enterpriseId": "enterprise-b",
+    "allowedModules": ["orders"],
+    "brandingId": "brand-b"
+  }
+}
