@@ -2,9 +2,7 @@ name: Enterprise modular architecture
 
 on:
   push:
-    paths: ['enterprise-modular/**', '.github/workflows/enterprise-modular.yml']
   pull_request:
-    paths: ['enterprise-modular/**', '.github/workflows/enterprise-modular.yml']
 
 permissions:
   contents: read
@@ -12,16 +10,13 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: enterprise-modular
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: enterprise-modular/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run check
       - run: npx playwright install --with-deps chromium
@@ -32,8 +27,8 @@ jobs:
         with:
           name: enterprise-modular-verification
           path: |
-            enterprise-modular/.audit
-            enterprise-modular/.artifacts
-            enterprise-modular/playwright-report
+            .audit
+            .artifacts
+            playwright-report
           include-hidden-files: true
           retention-days: 14

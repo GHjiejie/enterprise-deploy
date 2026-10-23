@@ -1,26 +1,32 @@
 import { defineConfig } from '@playwright/test';
-import { loadBuildProfile } from './build/load-profile.ts';
-import { parseBuildMode } from './shared/build-profile.ts';
-
-const profile = loadBuildProfile(process.env.APP_PROFILE);
-const mode = parseBuildMode(process.env.APP_MODE ?? 'production');
-const port = Number(process.env.DELIVERY_PORT ?? 4173);
-if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('DELIVERY_PORT 无效');
-const origin = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
-  testDir: './tests/delivery',
-  testMatch: 'browser.spec.ts',
-  fullyParallel: true,
-  forbidOnly: Boolean(process.env.CI),
+  testDir: './tests/e2e',
+  testMatch: '**/*.spec.ts',
+  fullyParallel: false,
+  timeout: 30000,
   retries: process.env.CI ? 1 : 0,
-  workers: 2,
+  workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
-  use: { baseURL: origin, browserName: 'chromium', trace: 'retain-on-failure' },
-  webServer: {
-    command: `npm run preview -- --mode ${mode} --port ${port}`,
-    url: origin,
-    reuseExistingServer: false,
-    env: { APP_PROFILE: profile.id },
+  use: {
+    browserName: 'chromium',
+    headless: true,
+    viewport: { width: 1440, height: 1000 },
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
   },
+  webServer: [
+    {
+      command: 'node --import tsx tests/e2e/server.ts --enterprise enterprise-a --port 5191',
+      url: 'http://127.0.0.1:5191',
+      timeout: 120000,
+      reuseExistingServer: false,
+    },
+    {
+      command: 'node --import tsx tests/e2e/server.ts --enterprise enterprise-b --port 5192',
+      url: 'http://127.0.0.1:5192',
+      timeout: 120000,
+      reuseExistingServer: false,
+    },
+  ],
 });

@@ -1,142 +1,145 @@
-# enterprise-deploy
+# 前端多企业定制与构建时模块裁剪
 
-一套代码，通过版本化企业配置独立构建、独立交付。基于 Vite、React、TypeScript，企业模块在构建时装配并进行物理裁剪，用户页面权限在运行时独立判断。
+依据《前端多企业定制与构建时模块裁剪 架构设计文档 v1.0》实现的独立 Vue 3 + TypeScript + Vite 应用。企业白名单在 Node 构建端完成校验，生成唯一静态模块入口；浏览器只消费本次已装配模块。源码边界、应用和 Worker 构建图、最终目录和压缩包均有校验。
 
-关闭模块的私有实现、文案、样式及专属资源不得进入该企业交付包。构建使用仅包含已启用模块的虚拟入口，并检查浏览器构建依赖图、输出归属和最终文件。模型、会话、图片、视频页面仍为本地演示，没有连接真实业务后端；真实身份和服务端逐请求授权属于后续接入工作。
+企业 A 包含订单、报表和订单导出，企业 B 只包含订单。B 的报表页面、导出组件、API 适配器、CSV 算法、Worker、样式和专属图片均不进入交付图与文件。订单页通过中立扩展点消费工具，不引用导出实现。
 
-## 可视化配置与打包
-
-无需手写企业模块开关。在项目根目录执行：
-
-```bash
-npm ci
-npm run configure
-```
-
-打开 http://127.0.0.1:5180 ，选择或新建企业，勾选开放模块、设置默认页面和构建环境，再点击「保存并构建」。页面展示配置校验、编译与裁剪、快照和压缩包复验的实际阶段与日志；成功后可以预览固定版本、下载 `.tar.gz` 交付包和裁剪报告。
-
-配置保存到企业 JSON，构建使用隔离快照。构建控制台是独立的本地工具，不加入客户静态包；它不配置用户角色，也不会自动放宽部署目标允许的模块上限。详见 [可视化控制台说明](docs/build-console.md)。
+这是可运行的架构实现与本地交付工具。订单、报表、导出适配器使用明确标记的演示数据；未提供业务后端、真实身份协议或线上发布目标。服务端逐请求授权、CDN 清理和真实环境联调仍需在接入相应系统后完成。
 
 ## 本地运行
 
-需要 Node.js 22.12+（22 LTS）或 24+，使用 npm 和仓库中的 `package-lock.json`。
+项目直接位于仓库根目录，本文所有命令均在仓库根目录执行。需要 Node.js 22.12+（22 LTS）或 24+、npm，以及系统 `tar`（支持 GNU tar / macOS bsdtar）。所有直接依赖均锁定版本，使用根目录的 `package-lock.json` 安装：
 
 ```bash
 npm ci
-APP_PROFILE=qianshi npm run dev
 ```
 
-打开 http://127.0.0.1:5173 。必须显式设置 `APP_PROFILE`，没有默认全功能降级。修改企业配置后重启开发服务器。
+启动业务页面：
 
-| 企业配置       | 模型广场 | 智能对话 | 图片生成体验 | 视频生成体验 |
-| -------------- | -------- | -------- | ------------ | ------------ |
-| `standard`     | 开启     | 开启     | 开启         | 开启         |
-| `enterprise-a` | 开启     | 开启     | 关闭         | 关闭         |
-| `enterprise-b` | 开启     | 开启     | 开启         | 开启         |
-| `qianshi`      | 关闭     | 关闭     | 关闭         | 开启         |
+```bash
+# 必须显式选择企业；没有默认全功能降级
+APP_ENTERPRISE=enterprise-a npm run dev
+# 或 APP_ENTERPRISE=enterprise-b npm run dev
+```
 
-页面的「演示权限」选择器用于验证管理员、普通成员、仅对话权限、无页面权限和未登录情形。当前演示产物即使使用 `production` 模式也仍包含演示身份；它不能作为生产认证或真实 API 授权。生产业务接入必须替换该适配器和演示入口。管理员也无法从活动注册表访问未交付的模块。
+开发地址为 <http://127.0.0.1:5190>。修改企业清单后重启开发服务。开发服务用于本地编码；交付验收运行封包后的生产站点。
 
-## 构建与验证
+在另一个终端进入同一仓库根目录，启动配置与打包控制台：
+
+```bash
+npm run configure
+```
+
+打开 <http://127.0.0.1:5193>，在 UI 中新建或选择企业、勾选模块、选择品牌与环境，再点击「保存并打包」。控制台展示真实流水线并支持制品下载，完整操作和任务快照说明见 [可视化企业配置与打包](docs/build-console.md)。
+
+| 企业         | 订单 | 报表 | 订单导出 | 品牌    |
+| ------------ | ---- | ---- | -------- | ------- |
+| enterprise-a | 开启 | 开启 | 开启     | brand-a |
+| enterprise-b | 开启 | 关闭 | 关闭     | brand-b |
+
+页面中的「演示权限」支持管理员、普通成员和无权限身份。可见功能取已交付能力、运行时服务许可集合、用户权限的交集；演示身份不能代替真实认证或服务端授权。
+
+## 构建、审计和封包
+
+```bash
+# release-id 可省略，此时生成 UUID；手工指定时必须每次使用新的 ID
+npm run build -- --enterprise enterprise-a --mode production --release-id local-a-001
+npm run audit -- --enterprise enterprise-a --release-id local-a-001
+npm run package -- --enterprise enterprise-a --release-id local-a-001
+npm run preview -- --enterprise enterprise-a --release-id local-a-001 --port 5191
+
+npm run build -- --enterprise enterprise-b --mode production --release-id local-b-001
+npm run package -- --enterprise enterprise-b --release-id local-b-001
+npm run preview -- --enterprise enterprise-b --release-id local-b-001 --port 5192
+```
+
+`mode` 支持 `development`、`staging`、`production`；企业与环境分开选择。生产和 staging 构建明确固定框架的生产条件，不受调用进程的 `NODE_ENV=test` 影响。`.env.local` 和对应环境的 `.local` 覆盖文件被拒绝，公开环境变量使用 `PUBLIC_` 前缀。
+
+构建入口先校验完整目录表、企业依赖闭包和本次可达源码，再执行严格类型检查。随后创建独占的任务目录，为应用和每个 Worker 创建新的插件实例，采集来源并在写盘后校验全部文件。源码或策略在构建期间变化、未知输入、禁用 owner、缺失 Worker 上下文、输出碰撞、文件集合或哈希变化均使构建失败。
+
+直接 `vite build` 被拒绝，必须使用完整协调器。相同 release ID 不能复用；失败任务保留私有诊断且没有可交付资格，重试使用新 ID。无需写入共享的 `src/generated` 文件，因此 A/B 可并行构建。
+
+```text
+.work/<enterprise>/<release-id>/site/       本次待审计站点
+.audit/<enterprise>/<release-id>/audit.json 私有来源、上下文、文件与哈希证据
+.audit/<enterprise>/<release-id>/package.json 私有包摘要与审计绑定
+.artifacts/<enterprise>/<release-id>.tar.gz 可传输站点包
+release/<enterprise>/<release-id>/site/     封包后冻结的站点文件
+```
+
+站点与压缩包仅含批准文件。完整模块目录、其他企业配置、绝对源码路径、完整审计报告和 source map 不放入客户站点。包记录绑定审计报告摘要、站点摘要和 `.tar.gz` 摘要。复验还读取压缩包中的每个普通文件，与批准哈希逐项比较，拒绝额外目录、路径穿越、软链接、缺失文件、篡改内容和遗留压缩副本。
+
+## 本地发布和回滚
+
+```bash
+npm run publish -- --target local-enterprise-a --release-id local-a-001
+npm run publish -- --target local-enterprise-b --release-id local-b-001
+```
+
+发布目标必须登记在 `config/delivery-targets.json`，并独立声明企业、品牌和允许模块上限。发布端复验已封包制品，从同一份已校验的压缩包字节提取内容；不重新构建。仅 `production` 制品可进入发布适配器。
+
+版本保存在私有 `.deploy/<target>/`，通过原子替换 `deployments/<target>/current` 符号链接切换。目标目录只暴露 `current`，旧版本和私有部署记录保存在其外。Web 服务器的根目录必须指向 `current`，不要公开整个仓库或 `.deploy`。每个目标有独占发布锁。
+
+回滚使用同一条 `publish` 命令和历史 release ID，并重新执行所有门禁。历史制品必须与当前企业配置、构建策略和锁定工具链兼容；策略变化时采用重新构建的方式恢复合规版本。企业许可收缩后，旧的全功能制品会被拒绝。浏览器已保存的历史代码无法撤回；真实 CDN、Service Worker 和远端存储的失效操作需要相应部署适配器。
+
+预览服务冻结已验证字节，只监听 `127.0.0.1`。HTML 深链支持 SPA 回退，缺失 JS、CSS、图片和私有文件始终返回 404，便于准确验证旧资源地址。
+
+## 代码组织
+
+| 路径                         | 职责                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| `config/enterprises/`        | schemaVersion 1 企业白名单，不隐式继承                       |
+| `config/module-catalog.json` | 入口、能力依赖、互斥、业务归属根和批准包                     |
+| `config/brands.json`         | 企业品牌资源登记                                             |
+| `build-console/src/`         | 企业配置、模块选择、构建进度、历史和制品下载界面             |
+| `build/console/`             | 本机配置 API、版本冲突校验、项目快照和真实构建任务           |
+| `build/policy/manifest.ts`   | 纯数据校验、路径验证、依赖排序与配置摘要                     |
+| `build/policy/origin.ts`     | file URL、别名解析后的真实路径、查询后缀、软链接和生成器归属 |
+| `build/policy/scan.ts`       | TS / Vue / CSS 可达源码扫描和优化前边界检查                  |
+| `build/plugins/registry.ts`  | 唯一静态业务入口与品牌入口                                   |
+| `build/plugins/guard.ts`     | 应用 / Worker 图守卫、分块模块与资产来源采集                 |
+| `build/audit/`               | 审计协议运行时校验、上下文合并、文件对账、哈希验证           |
+| `build/enterprise.ts`        | 隔离构建协调器                                               |
+| `build/package.ts`           | 批准文件封包与归档内容复验                                   |
+| `build/publish.ts`           | 企业目标约束、同字节制品发布与原子切换                       |
+| `src/contracts/`             | 中立功能、页面、菜单、订单工具与导出消息契约                 |
+| `src/composition/`           | 唯一模块汇总、冲突检测与显式生命周期                         |
+| `src/core/`                  | 工作台壳、404、权限交集与加载失败提示                        |
+| `src/shared/`                | 通用格式化工具                                               |
+| `src/modules/`               | orders / reports / order-export 的私有实现和资源             |
+| `tests/architecture/`        | 结构、反向引用、真实构建、封包、目标与篡改用例               |
+| `tests/e2e/`                 | 封包后生产站点浏览器验收                                     |
+| `tests/console/`             | 控制台配置、快照、API 与浏览器完整打包验收                   |
+
+业务模块可以依赖自身实现、中立契约、通用组件和基础服务，不能导入其他业务模块实现。核心和共享层不能反向导入业务。完整业务注册表只能被 composition 消费。`order-export requires orders` 只表示安装依赖，其按钮仍通过 `OrderToolContext` 取得订单快照。
+
+模块入口仅描述能力。`activateModules` 按装配顺序显式启动，失败时回收已启动模块，清理按相反顺序执行且幂等；页面请求和导出 Worker 在组件卸载时取消或销毁。扩展为空时订单页面仍可独立运行。
+
+## 扩展企业或能力
+
+新增企业时，添加完整企业 JSON，并在品牌目录表中登记资源。参与发布时，另行登记受控的目标模块上限。未知企业、未知模块、重复 ID、未知字段、缺失依赖、依赖环、互斥组合、重叠归属和无归属入口均会失败，不自动补开模块。
+
+新增模块时，将页面、按钮、API、算法、样式、图片、Worker 和专属包放在同一归属边界内，更新纯数据目录表和企业白名单，并补齐正反向测试。专属工作区包要登记在 `ownedRoots`；真实路径归属优先于通用 node_modules 批准规则。新增第三方包需明确批准，不能把整个 node_modules 当作共享白名单。
+
+当前实现支持 Vue SFC、TypeScript、普通 CSS、源码引入的静态资产及 Vite ES Worker。应用与实际 Worker 分别提交成功记录；SSR、Service Worker 和独立入口登记为不适用。未经适配的 SSR / SW 加载、SharedWorker、Wasm、CSS 预处理器、自定义 SFC 块、远程代码加载、计算动态导入、glob 扫描和未知虚拟模块会被拒绝。`publicDir` 全量复制、资产内联、交付 source map 与预压缩副本关闭。需要扩展这些形式时，应同时增加来源适配器和反向验收。
+
+审计以受控工具链、真实来源登记和私有记录可信为前提。不能自动判断被人工复制进 shared 的业务语义，也不能防御任意恶意构建插件；构建脚本、目录表、企业配置、锁文件和私有审计记录需要纳入仓库与制品权限管理。
+
+## 验证
+
+本次执行结果、A/B 制品摘要和文档 T-01 至 T-12 的对应证据记录在 [架构实现验证记录](docs/verification-2026-10-16.md)。
 
 ```bash
 npm run check
-npm run test:pruning
-npm run test:console
-APP_PROFILE=qianshi npm run build -- --mode staging
-APP_PROFILE=qianshi npm run build -- --mode production
-
-# 对实际输出独立复验 V2 记录、裁剪报告及文件
-npm run pruning:verify -- --artifact dist/qianshi/production
-
-# 浏览器冒烟针对已经构建的静态产物运行
 npx playwright install chromium
-APP_PROFILE=qianshi APP_MODE=production npm run test:delivery
-
-# 本地顺序验收全部已保存企业 × staging / production
-npm run test:matrix
-
-# 通过 HTTP 预览，不能双击 index.html 使用 file:// 打开
-APP_PROFILE=qianshi npm run preview -- --mode production
+npm run test:e2e
+npm run test:console
 ```
 
-预览地址默认为 http://127.0.0.1:4173 。环境仅支持 `development`、`staging`、`production`。输出位于 `dist/<企业>/<环境>/`，可交付版本必须同时含 `pruning-report.json` 和 `schemaVersion: 2` 的 `release-record.json`。
+`check` 包含格式、严格类型、全部企业源码边界和 Vitest。测试执行全部五种合法非空能力组合的真实生产构建、staging 验证、A/B 并行构建，以及配置非法、别名 / 软链接 / barrel / raw / CSS / 死分支 / Worker 绕过、未知输出、额外 map / gz / br、篡改文件 / 审计 / 压缩包、目标上限和许可收缩等用例。
 
-`npm run build -- --mode ...` 是完整构建入口：取得企业/环境输出锁、使旧记录失效、完成类型和配置检查、编译与裁剪、生成报告及 V2 记录，再复验实际文件。协调器失败会清除成功记录并释放自己的锁。直接执行 `vite build` 也受构建图和输出门禁约束，但不生成可交付的 V2 成功记录；请使用 npm 构建入口。发布构建拒绝 `.env.local` 和对应 `.env.<mode>.local`，不要向浏览器环境变量写入秘密。
+Playwright 自动构建并封包 A/B，针对冻结生产文件测试订单、选择导出、报表资源、B 深链和网络请求、权限切换、搜索空态恢复、390px 窄屏、分块加载失败提示。两个本地测试端口为 5191 / 5192。
 
-`npm run check` 包含格式、严格类型、全部企业配置与基础单元测试。`test:pruning` 是独立必需验收，验证四模块的 15 个非空组合 × 两种发布环境，以及禁用依赖、私有资源、未知输出、原始 Vite、篡改和输出锁等负向情形。GitHub Actions 将组合验证放在独立作业，企业交付矩阵只运行各自真实构建、浏览器、裁剪和目标发布校验。
+[GitHub Actions 工作流](.github/workflows/enterprise-modular.yml) 在每次 push 和 pull request 时触发，从仓库根目录安装依赖并执行检查、业务与控制台浏览器验收，上传根目录下的 `.audit/`、`.artifacts/` 和 `playwright-report/`。真实后端授权与远端缓存失效测试需要在后端、身份服务和线上部署适配器接入后执行。
 
-## 代码边界
-
-```text
-config/profiles/                完整、显式的企业模块配置
-config/backend-compatibility.json   前端声明的后端兼容条件
-config/backend-policies/        发布兼容校验用的演示目标声明
-config/delivery-policies/       独立可信目标的模块上限与允许裁剪规则
-shared/module-assembly.ts       无导入副作用的装配算法
-build/module-catalog.ts         Node/控制台使用的完整模块目录
-build/active-modules-plugin.ts  按企业生成 virtual:enterprise-modules
-build/enterprise-config.ts      统一企业构建上下文与 Vite 配置
-build/build-enterprise.ts       完整构建协调器
-build/output-lock.ts            企业/环境输出锁与记录失效
-build/pruning-plugin.ts         浏览器图、私有依赖与输出来源检查
-build/pruning.ts                裁剪报告协议与统一最终文件验证器
-build/release-record.ts         V1 历史读取、V2 记录、交付目标校验
-build/release-cli.ts            本地归档、公开 generation、发布与回滚
-build/console-*.ts              配置、任务、严格打包与固定预览
-build-console/                 独立可视化配置界面
-src/app/                       消费活动注册表的路由、页面与导航
-src/platform/                  权限、跳转与显式生命周期
-src/modules/                   各模块私有业务、数据、文案和样式
-src/shared/                    通用表单、上传、任务展示等公共能力
-tests/pruning/                 30 组合与裁剪负向验证
-tests/profiles/                配置、装配、路由与生命周期测试
-tests/console/                 控制台、包安全、固定预览与下载测试
-tests/delivery/                发布策略、完整性、迁移及浏览器冒烟
-deploy/nginx.conf              current/site 与 current/assets 示例
-```
-
-客户应用只获得已启用模块的元数据、页面加载器与启动器；完整目录只供 Node 构建工具和控制台使用。公共层不能反向导入模块私有实现，模块不能跨越其他模块的私有目录。无法证明来源的输出、外部代码加载、source map 和未支持的资源形态会使构建失败，不能用一个空归属数组绕过检查。
-
-模块定义只声明路由、导航、入口、权限标识和依赖。`activateModules` 提供显式启动与反向清理扩展点；真实初始化必须放在该入口或权限已通过的页面生命周期内。路由、导航、快捷入口、旧别名、通用 playground 和详情深链均使用同一份活动注册表。
-
-公共上传与图片生成业务独立：视频或对话需要的图片/文件上传可以保留，不以 `image` 字符串是否出现判断泄漏。模型卡片保留某种 API 能力描述也不代表授予页面或 API 权限；完整模型业务数据只属于模型广场模块。
-
-## 增加企业或模块
-
-增加企业：使用控制台，或新增完整 `config/profiles/<id>.json`。校验与 CI 自动发现企业配置，不存在隐式继承。参加目标发布验收时，另外提供对应企业/环境的可信后端兼容声明和交付策略；不要从待发布包自动生成或放宽目标上限。
-
-增加模块：更新模块 ID、所有受支持企业的完整配置、Node 目录、模块元数据与私有入口，同时更新归属规则、目标策略和测试。未开放的企业明确填写 `false`；缺字段、无效依赖、默认入口关闭或未知字段均会失败。新增模块必须验证路由、资源、共享层引用、预加载与生命周期的完整依赖范围。
-
-## 归档、部署和回滚
-
-当前提供**本地文件系统部署适配器**，实际服务器、SSH、Kubernetes、CDN 或域名需要接入已有交付体系。完整命令和首次迁移步骤见 [交付操作说明](docs/delivery.md)。
-
-```bash
-npm run release:verify -- \
-  --profile qianshi --mode production \
-  --artifact dist/qianshi/production \
-  --backend-policy config/backend-policies/demo-qianshi-production.json \
-  --delivery-policy config/delivery-policies/demo-qianshi-production.json
-
-npm run release:deploy -- \
-  --profile qianshi --mode production \
-  --artifact dist/qianshi/production \
-  --target deployments/qianshi-production \
-  --backend-policy config/backend-policies/demo-qianshi-production.json \
-  --delivery-policy config/delivery-policies/demo-qianshi-production.json
-```
-
-发布和回滚只接受通过当前目标策略的 V2：企业/环境一致、开启模块不超过当前上限、裁剪规则版本与摘要被允许、后端兼容且实际文件一致。旧 V1 必须重新构建，不能通过补空报告或修改版本号升级。
-
-部署先保存私有归档，再准备 `public-generations/<id>/site` 和只含当前策略合规版本的 `assets`，最后原子切换同一个 `current` 指针。模块收缩后不合规旧资源不进入新公开集合，旧 URL 返回 404，旧标签页可能需要刷新。**首次升级必须同步应用新的 Nginx 根路径**；继续使用旧根 `/assets/` 配置仍会暴露旧资源。历史归档、旧根资源与证据不会自动删除。
-
-## 交付与安全边界
-
-- 当前整改覆盖构建装配、私有实现与资源裁剪、V2 证据、控制台快照/包复验及本地发布策略；技术方案 P1–P5 已通过本地验收，产物身份、矩阵及迁移限制见[整改验证记录](docs/pruning-verification-2026-10-15.md)。
-- 前端裁剪降低禁用实现随包交付的风险，不能阻止客户编写新代码，也不能召回已下载或已缓存的旧副本。
-- 企业模块开关不决定模型 API 商业权益、历史数据或运行中任务。真实服务端必须逐请求验证身份、企业权益、用户权限及资源归属。
-- 演示身份与 `demo-*.json` 兼容/交付策略仅用于本地流程，不代表生产授权或可信制品来源。SHA-256 检查字节一致性，真实来源依赖受控 CI、制品库、部署权限及所需签名机制。
-- 不提供运行时模块热切换或远程配置平台。Nginx 缺失静态资源返回真实 404；SPA 内部页面不存在仍可能由 HTTP 200 的 HTML 展示。
-
-原始依据见 [架构原文](docs/architecture.md)。[2026 年 10 月 15 日本地风险评估](docs/local-risk-assessment-2026-10-15.md) 保留整改前产物及受控恢复界面的证据，不改写原始审计结论。[企业模块物理裁剪与交付校验技术方案（V2）](docs/enterprise-build-pruning-design.md) 记录本轮设计与完成标准，P6 真实业务后端待接入。
+实现按锁定的 Vite 8 / Rolldown 接口适配。虚拟入口遵循 [Vite Plugin API](https://vite.dev/guide/api-plugin)；Worker 使用独立插件工厂，依据 [Vite Worker Options](https://vite.dev/config/worker-options)；资产复制与映射设置参见 [Vite Build Options](https://vite.dev/config/build-options)。升级工具链后应重跑完整反向集合与生产浏览器测试。

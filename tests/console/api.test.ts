@@ -1,331 +1,184 @@
-import { createServer, request as httpRequest, type Server } from 'node:http';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import type { BuildProfile } from '../../shared/build-profile.ts';
-import { handleConsoleRequest } from '../../build/console-api.ts';
-import {
-  createConsoleJobManager,
-  type ConsoleBuildRunner,
-  type ConsoleJobManager,
-} from '../../build/console-jobs.ts';
-import { createConsoleProfileStore } from '../../build/console-store.ts';
-import { writeReleaseRecord } from '../../build/release-record.ts';
-import { writeFixturePruningReport } from '../helpers/pruned-artifact.ts';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { request as httpRequest } from 'node:http';
+import { buildPaths, parseAudit } from '../../build/audit/record';
+import { loadPolicy } from '../../build/policy/manifest';
+import { parseBootstrap, parseJob, parseStarted } from '../../build/console/contracts';
+import { createBuildConsole } from '../../build/console/server';
+import { sha256 } from '../../build/utils';
+import { fixture } from '../helpers/fixture';
 
-const roots: string[] = [];
-const servers: Server[] = [];
-const managers: ConsoleJobManager[] = [];
-const releaseRunners: Array<() => void> = [];
-
-function profile(id = 'enterprise-a'): BuildProfile {
-  return {
-    schemaVersion: 1,
-    id,
-    modules: { modelCatalog: true, chat: true, imageStudio: false, videoStudio: false },
-    defaultModule: 'modelCatalog',
-  };
-}
-
-async function fixture(runner: ConsoleBuildRunner = async () => 1) {
-  const rootDir = mkdtempSync(join(realpathSync(tmpdir()), 'enterprise-console-api-'));
-  roots.push(rootDir);
-  const directory = join(rootDir, 'config/profiles');
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, 'enterprise-a.json'), JSON.stringify(profile()));
-  const store = createConsoleProfileStore(rootDir);
-  const jobs = createConsoleJobManager({ rootDir, store, runner });
-  managers.push(jobs);
-  let origin = '';
-  const server = createServer((request, response) => {
-    void handleConsoleRequest(request, response, { origin, store, jobs }).then((handled) => {
-      if (!handled) {
-        response.writeHead(404);
-        response.end();
-      }
-    });
+describe('local console API and real build', () => {
+  const project = fixture();
+  let app: Awaited<ReturnType<typeof createBuildConsole>>;
+  let token = '';
+  beforeAll(async () => {
+    app = await createBuildConsole({ root: project.root, port: 0 });
+    const data = parseBootstrap(await (await fetch(`${app.origin}/api/bootstrap`)).json());
+    token = data.csrfToken;
   });
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
-  origin = `http://127.0.0.1:${address.port}`;
+  afterAll(async () => {
+    await app?.close();
+    project.dispose();
+  });
+  const headers = () => ({
+    Origin: app.origin,
+    'X-Console-Token': token,
+    'Content-Type': 'application/json',
+  });
 
-  function request(
-    path: string,
-    options: {
-      method?: string;
-      body?: unknown;
-      rawBody?: string;
-      chunked?: boolean;
-      headers?: Record<string, string>;
-    } = {},
-  ): Promise<{ status: number; body: string; headers: Record<string, unknown>; json: unknown }> {
-    return new Promise((resolve, reject) => {
-      const body =
-        options.rawBody ?? (options.body === undefined ? '' : JSON.stringify(options.body));
-      const outgoing = httpRequest(
-        new URL(path, origin),
-        {
-          method: options.method ?? 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(options.chunked
-              ? { 'Transfer-Encoding': 'chunked' }
-              : { 'Content-Length': Buffer.byteLength(body) }),
-            ...options.headers,
-          },
-        },
-        (incoming) => {
-          const chunks: Buffer[] = [];
-          incoming.on('data', (chunk: Buffer) => chunks.push(chunk));
-          incoming.on('end', () => {
-            const responseBody = Buffer.concat(chunks).toString();
-            let json: unknown;
-            try {
-              json = JSON.parse(responseBody);
-            } catch {
-              json = undefined;
-            }
-            resolve({
-              status: incoming.statusCode ?? 0,
-              body: responseBody,
-              headers: incoming.headers,
-              json,
-            });
-          });
+  it('exposes only structured configuration and rejects foreign origins, hosts and missing session tokens', async () => {
+    const data = parseBootstrap(await (await fetch(`${app.origin}/api/bootstrap`)).json());
+    expect(data.modules.map((item) => item.id)).toEqual(['orders', 'reports', 'order-export']);
+    expect(data.brands).toHaveLength(2);
+    expect(data.enterprises).toHaveLength(2);
+    expect(
+      (
+        await fetch(`${app.origin}/api/bootstrap`, {
+          headers: { Origin: 'https://example.invalid' },
+        })
+      ).status,
+    ).toBe(403);
+    const foreignHost = await new Promise<number>((done, reject) => {
+      const request = httpRequest(
+        `${app.origin}/api/bootstrap`,
+        { headers: { Host: 'example.invalid' } },
+        (response) => {
+          response.resume();
+          done(response.statusCode ?? 0);
         },
       );
-      outgoing.on('error', reject);
-      outgoing.end(body);
+      request.once('error', reject);
+      request.end();
     });
-  }
-  return { request, store, jobs, rootDir, origin };
-}
-
-afterEach(async () => {
-  for (const release of releaseRunners.splice(0)) release();
-  await Promise.all(managers.splice(0).map((jobs) => jobs.dispose()));
-  await Promise.all(
-    servers
-      .splice(0)
-      .map((server) => new Promise<void>((resolve) => server.close(() => resolve()))),
-  );
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
-describe('local build console API', () => {
-  it('downloads the verified pruning report and package, refusing changes before a later download', async () => {
-    const { request, jobs, store } = await fixture(async (run) => {
-      const outDir = join(run.rootDir, 'dist', run.profile.id, run.mode);
-      mkdirSync(outDir, { recursive: true });
-      writeFileSync(join(outDir, 'index.html'), '<html>verified fixture</html>');
-      writeReleaseRecord({
-        outDir,
-        profile: run.profile,
-        mode: run.mode,
-        buildId: run.jobId,
-        pruning: writeFixturePruningReport(outDir, run.profile, run.mode, run.jobId),
-        backendCompatibility: {
-          policyVersion: 'v1',
-          contractVersion: 'v1',
-          requiredCapabilities: [],
-        },
-      });
-      return 0;
-    });
-    const started = await request('/api/builds', {
-      method: 'POST',
-      body: { profile: profile(), expectedRevision: store.list()[0]!.revision, mode: 'production' },
-    });
-    const id = (started.json as { job: { id: string } }).job.id;
-    await expect.poll(() => jobs.get(id)?.status).toBe('succeeded');
-    const report = await request(`/api/builds/${id}/pruning-report`);
-    expect(report.status).toBe(200);
-    expect(report.json).toMatchObject({
-      buildId: id,
-      enabledModules: ['modelCatalog', 'chat'],
-      excludedModules: ['imageStudio', 'videoStudio'],
-    });
-    expect(report.headers['content-disposition']).toContain('pruning-report.json');
-    const downloaded = await request(`/api/builds/${id}/package`);
-    expect(downloaded.status).toBe(200);
-    expect(downloaded.headers['content-type']).toBe('application/gzip');
-    const artifact = jobs.getArtifact(id)!;
-    writeFileSync(join(artifact.siteDirectory, 'index.html'), 'tampered');
-    expect((await request(`/api/builds/${id}/package`)).status).toBe(500);
-    expect((await request(`/api/builds/${id}/pruning-report`)).status).toBe(500);
-  });
-
-  it('returns dynamic profile/module metadata and saves a newly named enterprise', async () => {
-    const { request } = await fixture();
-    const bootstrap = await request('/api/bootstrap');
-    expect(bootstrap.status).toBe(200);
-    expect(bootstrap.json).toMatchObject({
-      modules: [
-        { id: 'modelCatalog', label: '模型广场', entryPath: '/models' },
-        { id: 'chat', label: '智能对话', entryPath: '/chat' },
-        { id: 'imageStudio', label: '图片生成' },
-        { id: 'videoStudio', label: '视频生成' },
-      ],
-      profiles: [{ profile: profile() }],
-      activeJob: null,
-    });
-    expect(bootstrap.headers['access-control-allow-origin']).toBeUndefined();
-    const saved = await request('/api/profiles/enterprise-c', {
-      method: 'PUT',
-      body: { profile: profile('enterprise-c'), expectedRevision: null },
-    });
-    expect(saved.status).toBe(200);
-    expect(saved.json).toMatchObject({ profile: profile('enterprise-c') });
-  });
-
-  it('detects concurrent edits and refuses mismatched path ids', async () => {
-    const { request, store } = await fixture();
-    const revision = store.list()[0]!.revision;
-    const changed = { ...profile(), modules: { ...profile().modules, imageStudio: true } };
+    expect(foreignHost).toBe(403);
     expect(
       (
-        await request('/api/profiles/enterprise-a', {
+        await fetch(`${app.origin}/api/enterprises`, {
           method: 'PUT',
-          body: { profile: changed, expectedRevision: revision },
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
         })
       ).status,
-    ).toBe(200);
-    const stale = await request('/api/profiles/enterprise-a', {
-      method: 'PUT',
-      body: { profile: profile(), expectedRevision: revision },
-    });
-    expect(stale.status).toBe(409);
-    expect(stale.json).toMatchObject({ error: { code: 'conflict' } });
+    ).toBe(403);
     expect(
-      (
-        await request('/api/profiles/enterprise-d', {
-          method: 'PUT',
-          body: { profile: profile('enterprise-c'), expectedRevision: null },
-        })
-      ).status,
-    ).toBe(400);
-    expect(store.list()[0]!.profile).toEqual(changed);
+      (await fetch(`${app.origin}/@fs${project.root}/config/enterprises/enterprise-a.json`)).status,
+    ).toBe(403);
   });
 
-  it('blocks saves and second builds while a build is active', async () => {
-    let release: (() => void) | undefined;
-    const { request, store } = await fixture(
-      () =>
-        new Promise<number>((resolve) => {
-          release = () => resolve(1);
-          releaseRunners.push(release);
-        }),
-    );
-    const body = {
-      profile: profile(),
-      expectedRevision: store.list()[0]!.revision,
-      mode: 'production',
+  it('saves valid profiles and refuses invalid bodies and stale revisions', async () => {
+    const profile = {
+      schemaVersion: 1,
+      enterpriseId: 'api-company',
+      enabledModules: ['orders'],
+      brandingId: 'brand-b',
     };
-    const started = await request('/api/builds', { method: 'POST', body });
-    expect(started.status).toBe(202);
-    const id = (started.json as { job: { id: string } }).job.id;
-    expect((await request(`/api/builds/${id}`)).json).toMatchObject({ status: 'running' });
-    expect(
-      (
-        await request('/api/profiles/enterprise-c', {
-          method: 'PUT',
-          body: { profile: profile('enterprise-c'), expectedRevision: null },
-        })
-      ).status,
-    ).toBe(409);
-    expect(
-      (
-        await request('/api/builds', {
-          method: 'POST',
-          body: { profile: profile('enterprise-d'), expectedRevision: null, mode: 'production' },
-        })
-      ).status,
-    ).toBe(409);
-    expect(store.list().map((entry) => entry.profile.id)).toEqual(['enterprise-a']);
-    expect((await request(`/api/builds/${id}/package`)).status).toBe(409);
-    release!();
-    await expect
-      .poll(() => request(`/api/builds/${id}`).then((result) => result.json))
-      .toMatchObject({
-        status: 'failed',
-        result: null,
-      });
-    expect((await request(`/api/builds/${id}/package`)).status).toBe(409);
-  });
-
-  it.each([
-    {
-      profile: { ...profile('new-enterprise'), defaultModule: 'imageStudio' },
-      expectedRevision: null,
-      mode: 'production',
-    },
-    { profile: profile('new-enterprise'), expectedRevision: null, mode: 'development' },
-    { profile: profile('../escape'), expectedRevision: null, mode: 'production' },
-    {
-      profile: profile('new-enterprise'),
-      expectedRevision: null,
-      mode: 'production',
-      command: 'echo injected',
-    },
-  ])('rejects invalid build requests without saving or executing: %j', async (body) => {
-    let calls = 0;
-    const { request, store } = await fixture(async () => {
-      calls++;
-      return 0;
-    });
-    expect((await request('/api/builds', { method: 'POST', body })).status).toBe(400);
-    expect(store.list().map((entry) => entry.profile.id)).toEqual(['enterprise-a']);
-    expect(calls).toBe(0);
-  });
-
-  it.each([
-    { Origin: 'https://external.example' },
-    { Origin: 'null' },
-    { Host: 'external.example' },
-    { 'Sec-Fetch-Site': 'cross-site' },
-  ])('rejects cross-origin or unexpected Host requests %j', async (headers) => {
-    const { request, rootDir } = await fixture();
-    const before = readFileSync(join(rootDir, 'config/profiles/enterprise-a.json'), 'utf8');
-    const result = await request('/api/profiles/enterprise-a', {
+    const create = await fetch(`${app.origin}/api/enterprises`, {
       method: 'PUT',
-      headers,
-      body: { profile: profile(), expectedRevision: null },
+      headers: headers(),
+      body: JSON.stringify({ profile, expectedRevision: null }),
     });
-    expect(result.status).toBe(403);
-    expect(result.headers['access-control-allow-origin']).toBeUndefined();
-    expect(readFileSync(join(rootDir, 'config/profiles/enterprise-a.json'), 'utf8')).toBe(before);
+    expect(create.status).toBe(200);
+    expect(
+      JSON.parse(
+        readFileSync(resolve(project.root, 'config/enterprises/api-company.json'), 'utf8'),
+      ),
+    ).toEqual(profile);
+    const conflict = await fetch(`${app.origin}/api/enterprises`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ profile, expectedRevision: null }),
+    });
+    expect(conflict.status).toBe(409);
+    const invalid = await fetch(`${app.origin}/api/builds`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        profile: { ...profile, enterpriseId: '../escape' },
+        expectedRevision: null,
+        mode: 'production',
+      }),
+    });
+    expect(invalid.status).toBe(400);
   });
 
-  it('rejects non-JSON, oversized and malformed requests', async () => {
-    const { request } = await fixture();
+  it('builds an immutable snapshot, verifies downloads, previews it and retains history after restart', async () => {
+    const data = parseBootstrap(await (await fetch(`${app.origin}/api/bootstrap`)).json());
+    const entry = data.enterprises.find((item) => item.profile.enterpriseId === 'enterprise-b');
+    if (!entry) throw new Error('fixture');
+    const startedResponse = await fetch(`${app.origin}/api/builds`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        profile: entry.profile,
+        expectedRevision: entry.revision,
+        mode: 'production',
+      }),
+    });
+    expect(startedResponse.status).toBe(202);
+    const started = parseStarted(await startedResponse.json());
+    const busy = await fetch(`${app.origin}/api/enterprises`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ profile: entry.profile, expectedRevision: started.entry.revision }),
+    });
+    expect(busy.status).toBe(409);
+    writeFileSync(
+      resolve(project.root, 'config/enterprises/enterprise-b.json'),
+      JSON.stringify({ ...entry.profile, enabledModules: ['orders', 'reports'] }),
+    );
+    let job = started.job;
+    const deadline = Date.now() + 30000;
+    while (job.status === 'running' && Date.now() < deadline) {
+      await new Promise<void>((done) => setTimeout(done, 100));
+      job = parseJob(await (await fetch(`${app.origin}/api/builds/${job.id}`)).json());
+    }
+    expect(job.status, job.log).toBe('succeeded');
+    expect(job.result?.enabledModules).toEqual(['orders']);
+    expect(job.result?.excludedModules.slice().sort()).toEqual(['order-export', 'reports']);
+    const archive = await fetch(`${app.origin}/api/builds/${job.id}/package`);
+    expect(archive.status).toBe(200);
+    expect(sha256(new Uint8Array(await archive.arrayBuffer()))).toBe(job.result?.packageHash);
+    const report = await fetch(`${app.origin}/api/builds/${job.id}/report`);
+    expect(report.status).toBe(200);
+    const snapshotRoot = resolve(project.root, '.console/runs', job.id, 'project');
+    const audit = parseAudit(
+      await report.json(),
+      loadPolicy(snapshotRoot, job.profile.enterpriseId),
+    );
+    expect(audit.enabledModules).toEqual(['orders']);
+    expect(audit.sources.inputs.every((input) => !input.id.includes('build-console'))).toBe(true);
+    const [preview, concurrentPreview] = await Promise.all([
+      fetch(`${app.origin}/api/builds/${job.id}/preview`, { redirect: 'manual' }),
+      fetch(`${app.origin}/api/builds/${job.id}/preview`, { redirect: 'manual' }),
+    ]);
+    expect(preview.status).toBe(302);
+    expect(concurrentPreview.status).toBe(302);
+    const location = preview.headers.get('Location');
+    if (!location) throw new Error('preview');
+    expect(concurrentPreview.headers.get('Location')).toBe(location);
+    expect((await fetch(`${location}orders`, { headers: { Accept: 'text/html' } })).status).toBe(
+      200,
+    );
     expect(
-      (
-        await request('/api/builds', {
-          method: 'POST',
-          rawBody: '{}',
-          headers: { 'Content-Type': 'text/plain' },
-        })
-      ).status,
-    ).toBe(415);
+      (await fetch(`${location}assets/missing.js`, { headers: { Accept: 'text/html' } })).status,
+    ).toBe(404);
+    await app.close();
+    app = await createBuildConsole({ root: project.root, port: 0 });
     expect(
-      (await request('/api/builds', { method: 'POST', rawBody: 'x'.repeat(1024 * 1024 + 1) }))
-        .status,
-    ).toBe(413);
-    expect(
-      (
-        await request('/api/builds', {
-          method: 'POST',
-          rawBody: 'x'.repeat(1024 * 1024 + 1),
-          chunked: true,
-        })
-      ).status,
-    ).toBe(413);
-    expect((await request('/api/builds', { method: 'POST', rawBody: '{broken' })).status).toBe(400);
-    expect((await request('/api/builds', { method: 'POST', body: [] })).status).toBe(400);
-    expect((await request('/api/builds/unknown')).status).toBe(404);
-    expect((await request('/api/bootstrap', { method: 'POST', body: {} })).status).toBe(405);
+      parseBootstrap(await (await fetch(`${app.origin}/api/bootstrap`)).json()).jobs.find(
+        (item) => item.id === job.id,
+      )?.status,
+    ).toBe('succeeded');
+    expect((await fetch(`${app.origin}/api/builds/${job.id}/package`)).status).toBe(200);
+    const site = resolve(
+      buildPaths(resolve(project.root, '.console/runs', job.id, 'project'), 'enterprise-b', job.id)
+        .release,
+      'site/index.html',
+    );
+    writeFileSync(site, `${readFileSync(site, 'utf8')}\n<!-- altered -->`);
+    expect((await fetch(`${app.origin}/api/builds/${job.id}/package`)).status).toBe(409);
+    expect((await fetch(`${app.origin}/api/builds/${job.id}/preview`)).status).toBe(409);
   });
 });

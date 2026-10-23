@@ -1,67 +1,75 @@
-import type {
-  BuildJob,
-  ConsoleBootstrap,
-  ProfileEntry,
-  SaveProfileRequest,
-  StartBuildRequest,
-  StartBuildResponse,
-} from '../../shared/build-console.ts';
+import { parseBootstrap, parseEntry, parseJob, parseStarted } from '../../build/console/contracts';
+import type { Enterprise } from '../../build/policy/types';
+import type { ReleaseMode } from '../../build/console/contracts';
 
-export class ConsoleRequestError extends Error {
+export class ApiError extends Error {
   constructor(
-    message: string,
     readonly code: string,
-    readonly status: number,
+    message: string,
   ) {
     super(message);
-    this.name = 'ConsoleRequestError';
   }
 }
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init.headers },
-  });
-  const data: unknown = await response.json();
-  if (!response.ok) {
-    const error = isRecord(data) && isRecord(data.error) ? data.error : null;
-    throw new ConsoleRequestError(
-      typeof error?.message === 'string' ? error.message : '请求失败，请重试。',
-      typeof error?.code === 'string' ? error.code : 'REQUEST_FAILED',
-      response.status,
-    );
-  }
-  // These same-origin endpoints are implemented against the shared console contract.
-  return data as T;
-}
-
-export const consoleApi = {
-  bootstrap(signal: AbortSignal): Promise<ConsoleBootstrap> {
-    return request('/api/bootstrap', { signal });
-  },
-  save(id: string, body: SaveProfileRequest): Promise<ProfileEntry> {
-    return request(`/api/profiles/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
+async function request(path: string, options: RequestInit = {}): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
     });
-  },
-  build(body: StartBuildRequest): Promise<StartBuildResponse> {
-    return request('/api/builds', { method: 'POST', body: JSON.stringify(body) });
-  },
-  job(id: string, signal: AbortSignal): Promise<BuildJob> {
-    return request(`/api/builds/${encodeURIComponent(id)}`, { signal });
-  },
-};
-
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '操作失败，请重试。';
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ApiError('network', '无法连接本地控制台，请确认启动终端仍在运行后重试。');
+  }
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new ApiError('invalid_response', '控制台返回了无效响应，请重试。');
+  }
+  if (!response.ok) {
+    if (
+      data &&
+      typeof data === 'object' &&
+      'error' in data &&
+      data.error &&
+      typeof data.error === 'object' &&
+      'message' in data.error &&
+      typeof data.error.message === 'string' &&
+      'code' in data.error &&
+      typeof data.error.code === 'string'
+    )
+      throw new ApiError(data.error.code, data.error.message);
+    throw new ApiError('request_failed', `请求失败（${response.status}），请重试。`);
+  }
+  return data;
 }
-
-export function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
-}
+export const bootstrap = async (signal?: AbortSignal) =>
+  parseBootstrap(await request('/api/bootstrap', signal ? { signal } : {}));
+export const getJob = async (id: string, signal: AbortSignal) =>
+  parseJob(await request(`/api/builds/${encodeURIComponent(id)}`, { signal }));
+export const saveProfile = async (
+  profile: Enterprise,
+  expectedRevision: string | null,
+  token: string,
+) =>
+  parseEntry(
+    await request('/api/enterprises', {
+      method: 'PUT',
+      headers: { 'X-Console-Token': token },
+      body: JSON.stringify({ profile, expectedRevision }),
+    }),
+  );
+export const startBuild = async (
+  profile: Enterprise,
+  expectedRevision: string | null,
+  mode: ReleaseMode,
+  token: string,
+) =>
+  parseStarted(
+    await request('/api/builds', {
+      method: 'POST',
+      headers: { 'X-Console-Token': token },
+      body: JSON.stringify({ profile, expectedRevision, mode }),
+    }),
+  );

@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "policyVersion": "demo-v1",
-  "profileId": "standard",
-  "environment": "production",
-  "contractVersion": "demo-contract-v1",
-  "capabilities": []
-}

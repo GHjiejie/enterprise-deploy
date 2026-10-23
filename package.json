@@ -1,50 +1,45 @@
 {
-  "name": "enterprise-deploy",
-  "version": "0.1.0",
+  "name": "enterprise-modular",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": "^22.12.0 || >=24.0.0"
   },
   "scripts": {
-    "configure": "tsx build/console-server.ts",
+    "configure": "tsx build/console/server.ts",
     "dev": "vite --host 127.0.0.1",
-    "build": "tsx build/build-enterprise.ts",
-    "preview": "vite preview --host 127.0.0.1",
-    "typecheck": "tsc --noEmit",
-    "profiles:validate": "tsx build/validate-profiles.ts",
+    "build": "tsx build/enterprise.ts",
+    "validate": "tsx build/validate.ts",
+    "audit": "tsx build/audit.ts",
+    "package": "tsx build/package.ts",
+    "publish": "tsx build/publish.ts",
+    "preview": "tsx build/preview.ts",
+    "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:delivery": "playwright test",
+    "test:e2e": "playwright test",
     "test:console": "playwright test --config playwright.console.config.ts",
-    "test:matrix": "tsx build/delivery-matrix.ts",
-    "test:pruning": "vitest run --config vitest.pruning.config.ts",
-    "pruning:verify": "tsx build/verify-pruning.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run format:check && npm run typecheck && npm run profiles:validate && npm test",
-    "release:verify": "tsx build/release-cli.ts verify",
-    "release:archive": "tsx build/release-cli.ts archive",
-    "release:deploy": "tsx build/release-cli.ts deploy",
-    "release:rollback": "tsx build/release-cli.ts rollback"
+    "check": "npm run format:check && npm run typecheck && npm run validate && npm test"
   },
   "dependencies": {
-    "react": "19.3.1",
-    "react-dom": "19.3.1",
-    "react-router-dom": "7.18.4"
+    "vue": "3.5.44",
+    "vue-router": "5.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.0",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "6.1.2",
+    "@playwright/test": "1.58.0",
+    "@types/node": "22.19.2",
+    "@vitejs/plugin-vue": "6.0.10",
+    "@vue/compiler-dom": "3.5.44",
+    "@vue/compiler-sfc": "3.5.44",
     "postcss": "8.5.30",
     "postcss-value-parser": "4.2.0",
     "prettier": "3.6.2",
-    "tsx": "^4.20.0",
-    "typescript": "^5.9.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
     "vite": "8.3.4",
-    "vitest": "^4.0.0"
+    "vitest": "4.0.18",
+    "vue-tsc": "3.3.13"
   }
 }

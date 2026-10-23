@@ -1,329 +1,170 @@
-import { execFileSync } from 'node:child_process';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { parseReleaseRecord } from '../../build/release-record.ts';
-import type { BuildProfile } from '../../shared/build-profile.ts';
-import type { ConsoleBootstrap, StartBuildResponse } from '../../shared/build-console.ts';
-import { verifyConsolePackage } from '../../build/console-package.ts';
-import { verifyConsoleArtifact } from '../../build/console-artifact.ts';
-import { parsePruningReport } from '../../build/pruning.ts';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parseStarted } from '../../build/console/contracts';
+import { sha256 } from '../../build/utils';
 
-const profileId = process.env.CONSOLE_E2E_PROFILE_ID;
-const directory = process.env.CONSOLE_E2E_DIRECTORY;
-if (!profileId || !directory)
-  throw new Error('请使用 playwright.console.config.ts 运行可视化构建验收');
-const jobs = new Set<string>();
+const root = process.env.CONSOLE_E2E_ROOT;
+if (!root) throw new Error('Run using playwright.console.config.ts');
 
-test.afterAll(() => {
-  for (const id of jobs) {
-    if (/^[a-zA-Z0-9_-]+$/u.test(id)) {
-      rmSync(resolve('dist/.console', id), { recursive: true, force: true });
-    }
-  }
-  if (/^e2e-console-[a-f0-9]+$/u.test(profileId)) {
-    rmSync(resolve('dist', profileId), { recursive: true, force: true });
-  }
-});
-
-test('企业配置可切换、编辑并保存，刷新后读取实际配置文件', async ({ page, request }) => {
-  await page.goto('/');
-  const enterprise = page.getByRole('combobox', { name: '企业配置', exact: true });
-  await enterprise.selectOption('enterprise-a');
-  await expect(page.getByRole('checkbox', { name: '图片生成', exact: true })).not.toBeChecked();
-  await expect(page.getByRole('checkbox', { name: '视频生成', exact: true })).not.toBeChecked();
-  await enterprise.selectOption('enterprise-b');
-  await expect(page.getByRole('checkbox', { name: '图片生成', exact: true })).toBeChecked();
-  await enterprise.selectOption('enterprise-a');
-  await page.getByRole('checkbox', { name: '图片生成', exact: true }).check();
-  await page.getByRole('combobox', { name: /^默认页面/ }).selectOption('imageStudio');
-  const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/profiles/enterprise-a') &&
-      response.request().method() === 'PUT',
-  );
-  await page.getByRole('button', { name: '保存配置', exact: true }).click();
-  expect((await saved).ok()).toBe(true);
-  await page.reload();
-  await enterprise.selectOption('enterprise-a');
-  await expect(page.getByRole('checkbox', { name: '图片生成', exact: true })).toBeChecked();
-  await expect(page.getByRole('combobox', { name: /^默认页面/ })).toHaveValue('imageStudio');
-
-  const bootstrap = (await (await request.get('/api/bootstrap')).json()) as ConsoleBootstrap;
-  expect(
-    bootstrap.profiles.find((entry) => entry.profile.id === 'enterprise-a')?.profile.defaultModule,
-  ).toBe('imageStudio');
-  const savedProfile = JSON.parse(
-    readFileSync(join(directory, 'profiles/enterprise-a.json'), 'utf8'),
-  );
-  expect(savedProfile.modules.imageStudio).toBe(true);
-  expect(savedProfile.defaultModule).toBe('imageStudio');
-});
-
-test('非法模块组合会阻止提交，保存失败保留输入并可重试', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('enterprise-b');
-  await page.getByRole('checkbox', { name: '模型广场', exact: true }).uncheck();
-  await expect(
-    page.getByText('请选择一个已启用的模块作为默认页面。', { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole('button', { name: '保存并构建', exact: true })).toBeDisabled();
-  for (const name of ['智能对话', '图片生成', '视频生成']) {
-    await page.getByRole('checkbox', { name, exact: true }).uncheck();
-  }
-  await expect(page.getByText('请至少启用一个模块。', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '保存配置', exact: true })).toBeDisabled();
-
-  await page.getByRole('checkbox', { name: '智能对话', exact: true }).check();
-  await page.getByRole('combobox', { name: /^默认页面/ }).selectOption('chat');
-  await page.route('**/api/profiles/enterprise-b', async (route) => {
-    await route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: { code: 'unavailable', message: '测试保存失败，请重试。' } }),
-    });
-  });
-  await page.getByRole('button', { name: '保存配置', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('测试保存失败，请重试。');
-  await expect(page.getByRole('checkbox', { name: '智能对话', exact: true })).toBeChecked();
-  await expect(page.getByRole('checkbox', { name: '图片生成', exact: true })).not.toBeChecked();
-  await expect(page.getByRole('combobox', { name: /^默认页面/ })).toHaveValue('chat');
-  await page.unroute('**/api/profiles/enterprise-b');
-  const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/profiles/enterprise-b') &&
-      response.request().method() === 'PUT',
-  );
-  await page.getByRole('button', { name: '保存配置', exact: true }).click();
-  expect((await saved).ok()).toBe(true);
-  await page.reload();
-  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('enterprise-b');
-  await expect(page.getByRole('checkbox', { name: '模型广场', exact: true })).not.toBeChecked();
-  await expect(page.getByRole('combobox', { name: /^默认页面/ })).toHaveValue('chat');
-});
-
-test('外部修改造成版本冲突时保留草稿，显式重新加载后恢复编辑', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('enterprise-b');
-  const path = join(directory, 'profiles/enterprise-b.json');
-  const existing = JSON.parse(readFileSync(path, 'utf8')) as BuildProfile;
-  await page
-    .getByRole('checkbox', { name: '图片生成', exact: true })
-    .setChecked(!existing.modules.imageStudio);
-  const external = {
-    ...existing,
-    modules: { ...existing.modules, videoStudio: !existing.modules.videoStudio },
-  };
-  writeFileSync(path, `${JSON.stringify(external, null, 2)}\n`);
-
-  const rejected = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/profiles/enterprise-b') &&
-      response.request().method() === 'PUT',
-  );
-  await page.getByRole('button', { name: '保存配置', exact: true }).click();
-  expect((await rejected).status()).toBe(409);
-  await expect(page.getByRole('alert')).toContainText('请刷新后重试');
-  await expect(page.getByRole('checkbox', { name: '图片生成', exact: true })).toBeChecked({
-    checked: !existing.modules.imageStudio,
-  });
-  expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(external);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '重新加载已保存配置', exact: true }).click();
-  await expect(page.getByRole('checkbox', { name: '图片生成', exact: true })).toBeChecked({
-    checked: existing.modules.imageStudio,
-  });
-  await expect(page.getByRole('checkbox', { name: '视频生成', exact: true })).toBeChecked({
-    checked: external.modules.videoStudio,
-  });
-  await expect(page.getByRole('button', { name: '保存配置', exact: true })).toBeEnabled();
-});
-
-test('裁剪失败显示对应错误与日志并保留配置，不提供成功制品入口', async ({ page }) => {
+test('new enterprise, dependency validation, unsaved navigation and saved JSON survive refresh', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('__new__');
-  await page.getByRole('textbox', { name: /^企业标识/ }).fill('fixture-pruning-failure');
-  await page.getByRole('checkbox', { name: '视频生成', exact: true }).check();
-  await page.getByRole('combobox', { name: /^默认页面/ }).selectOption('videoStudio');
-  await page.route('**/api/builds', async (route) => {
-    const submitted = route.request().postDataJSON() as {
-      profile: BuildProfile;
-      mode: 'production';
-    };
-    const job = {
-      id: 'fixture-pruning-failure',
-      profile: submitted.profile,
-      mode: submitted.mode,
-      status: 'failed',
-      stage: 'failed',
-      startedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      log: 'Physical pruning: forbidden imageStudio dependency in videoStudio\\n',
-      error: '裁剪检查失败：videoStudio 引用了禁用的 imageStudio 模块。',
-      result: null,
-    };
-    await route.fulfill({
-      status: 202,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        entry: { profile: submitted.profile, revision: 'c'.repeat(64) },
-        job,
-      }),
-    });
+  await page.getByRole('textbox', { name: '企业标识', exact: true }).fill('ui-company');
+  await page.getByRole('checkbox', { name: '订单导出', exact: true }).check();
+  await expect(page.getByText('订单导出 需要启用 订单管理。', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '保存并打包', exact: true })).toBeDisabled();
+  await page.getByRole('checkbox', { name: '订单管理', exact: true }).check();
+  await page.getByRole('combobox', { name: '企业品牌', exact: true }).selectOption('brand-b');
+  await page.getByRole('combobox', { name: '构建环境', exact: true }).selectOption('staging');
+  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('enterprise-a');
+  await expect(page.getByRole('dialog', { name: '放弃未保存的修改？' })).toBeVisible();
+  await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '企业标识', exact: true })).toHaveValue(
+    'ui-company',
+  );
+  await page.getByRole('button', { name: '保存配置', exact: true }).click();
+  await expect(page.getByText('配置已保存。', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: '企业配置', exact: true })).toHaveValue(
+    'ui-company',
+  );
+  await expect(page.getByRole('checkbox', { name: '订单导出', exact: true })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: '企业品牌', exact: true })).toHaveValue(
+    'brand-b',
+  );
+  expect(
+    JSON.parse(readFileSync(resolve(root, 'config/enterprises/ui-company.json'), 'utf8')),
+  ).toEqual({
+    schemaVersion: 1,
+    enterpriseId: 'ui-company',
+    enabledModules: ['order-export', 'orders'],
+    brandingId: 'brand-b',
   });
-  await page.getByRole('button', { name: '保存并构建', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('构建失败');
-  await expect(page.getByRole('alert')).toContainText('videoStudio 引用了禁用的 imageStudio');
-  await expect(page.getByTestId('build-log')).toContainText('forbidden imageStudio dependency');
-  await expect(page.getByRole('checkbox', { name: '视频生成', exact: true })).toBeChecked();
-  await expect(page.getByRole('combobox', { name: /^默认页面/ })).toHaveValue('videoStudio');
-  await expect(page.getByRole('button', { name: '保存并构建', exact: true })).toBeEnabled();
-  await expect(page.getByTestId('build-result')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '下载交付包', exact: true })).toHaveCount(0);
 });
 
-test('可视化新建配置、一键真实构建、预览与下载均对应本次配置快照', async ({
+test('conflicting external edits preserve the draft until explicitly reloaded', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('enterprise-b');
+  await page.getByRole('checkbox', { name: '经营报表', exact: true }).check();
+  const file = resolve(root, 'config/enterprises/enterprise-b.json');
+  const profile = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+  writeFileSync(file, JSON.stringify({ ...profile, brandingId: 'brand-a' }));
+  await page.getByRole('button', { name: '保存配置', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('配置已被其他页面或编辑器修改');
+  await expect(page.getByRole('checkbox', { name: '经营报表', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: '重新加载服务器配置', exact: true }).click();
+  await page.getByRole('button', { name: '放弃修改并继续', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: '经营报表', exact: true })).not.toBeChecked();
+  await expect(page.getByRole('combobox', { name: '企业品牌', exact: true })).toHaveValue(
+    'brand-a',
+  );
+});
+
+test('real source-boundary failure shows logs, no download, and permits a corrected retry', async ({
+  page,
+}) => {
+  const source = resolve(root, 'src/modules/orders/api.ts');
+  const original = readFileSync(source);
+  writeFileSync(
+    source,
+    `${original.toString('utf8')}\nif (false) void import('../reports/api');\n`,
+  );
+  try {
+    await page.goto('/');
+    await page
+      .getByRole('combobox', { name: '企业配置', exact: true })
+      .selectOption('enterprise-b');
+    await page.getByRole('button', { name: '保存并打包', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('打包失败', { timeout: 30000 });
+    await expect(page.getByTestId('build-log')).toContainText('FORBIDDEN_MODULE');
+    await expect(page.getByRole('link', { name: '下载交付包' })).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: '订单管理', exact: true })).toBeChecked();
+  } finally {
+    writeFileSync(source, original);
+  }
+  await page.getByRole('button', { name: '保存并打包', exact: true }).click();
+  await expect(page.getByTestId('build-result')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('status')).toContainText('打包完成');
+});
+
+test('UI packages a fixed orders-only production version with refresh recovery, preview and downloads', async ({
   page,
   context,
-}, testInfo) => {
-  const runtimeErrors: string[] = [];
+}, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('__new__');
-  await page.getByRole('textbox', { name: /^企业标识/ }).fill(profileId);
-  await page.getByRole('checkbox', { name: '模型广场', exact: true }).check();
-  await page.getByRole('checkbox', { name: '智能对话', exact: true }).check();
-  await page.getByRole('combobox', { name: /^默认页面/ }).selectOption('chat');
-  await page.getByRole('combobox', { name: /^构建环境/ }).selectOption('production');
-  const started = page.waitForResponse(
+  await page.getByRole('textbox', { name: '企业标识', exact: true }).fill('ui-delivery');
+  await page.getByRole('checkbox', { name: '订单管理', exact: true }).check();
+  await page.getByRole('combobox', { name: '企业品牌', exact: true }).selectOption('brand-b');
+  await page.getByRole('combobox', { name: '构建环境', exact: true }).selectOption('production');
+  const responseEvent = page.waitForResponse(
     (response) => response.url().endsWith('/api/builds') && response.request().method() === 'POST',
   );
-  await page.getByRole('button', { name: '保存并构建', exact: true }).click();
-  const response = await started;
-  expect(response.ok()).toBe(true);
-  const { entry, job } = (await response.json()) as StartBuildResponse;
-  jobs.add(job.id);
-  expect(entry.profile.id).toBe(profileId);
-  expect(entry.profile.modules).toEqual({
-    modelCatalog: true,
-    chat: true,
-    imageStudio: false,
-    videoStudio: false,
-  });
-  await expect(page.getByTestId('build-result')).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByTestId('build-log')).toContainText('vite');
-  await expect(page.getByTestId('pruning-status')).toContainText('校验通过');
-  await expect(page.getByText('图片生成、视频生成', { exact: true })).toBeVisible();
-  await page.screenshot({
-    path: testInfo.outputPath('verified-build-desktop.png'),
-    fullPage: true,
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
+  await page.getByRole('button', { name: '保存并打包', exact: true }).click();
+  const started = parseStarted(await (await responseEvent).json());
+  expect(started.entry.profile.enabledModules).toEqual(['orders']);
+  await expect(page.getByRole('checkbox', { name: '订单管理', exact: true })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: '企业配置', exact: true })).toHaveValue(
+    'ui-delivery',
   );
-  await page.screenshot({ path: testInfo.outputPath('verified-build-mobile.png'), fullPage: true });
-  await page.setViewportSize({ width: 1280, height: 720 });
-
-  const previewOpened = context.waitForEvent('page');
-  await page.getByRole('link', { name: '预览构建结果', exact: true }).click();
-  const preview = await previewOpened;
-  preview.on('pageerror', (error) => runtimeErrors.push(error.message));
-  await expect(preview).toHaveURL(/\/chat$/);
-  await expect(preview.getByTestId('chat-page')).toBeVisible();
-  await expect(
-    preview
-      .getByRole('navigation', { name: '主导航' })
-      .getByRole('link', { name: '图片生成', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    preview
-      .getByRole('navigation', { name: '主导航' })
-      .getByRole('link', { name: '视频生成', exact: true }),
-  ).toHaveCount(0);
-  const recordResponse = await preview.request.get(
-    new URL('/release-record.json', preview.url()).href,
-  );
-  expect(recordResponse.ok()).toBe(true);
-  const previewRecord = parseReleaseRecord(await recordResponse.json());
-  expect(previewRecord.schemaVersion).toBe(2);
-  expect(previewRecord.profile).toEqual(entry.profile);
-  expect(previewRecord.environment).toBe('production');
-  expect(previewRecord.enabledModules).toEqual(['modelCatalog', 'chat']);
-  await preview.goto(new URL('/playground/image', preview.url()).href);
-  await expect(preview.getByTestId('route-not-found')).toBeVisible();
-
-  const downloaded = page.waitForEvent('download');
-  await page.getByRole('link', { name: '下载交付包', exact: true }).click();
-  const download = await downloaded;
-  expect(download.suggestedFilename()).toContain(`${profileId}-production-`);
-  const packagePath = testInfo.outputPath(download.suggestedFilename());
-  await download.saveAs(packagePath);
-  const inventory = execFileSync('tar', ['-tzf', packagePath], { encoding: 'utf8' });
-  expect(inventory).toContain('./index.html');
-  expect(inventory).toContain('./assets/');
-  expect(inventory).toContain('./release-record.json');
-  expect(inventory).toContain('./pruning-report.json');
-  expect(inventory).not.toMatch(/config\/profiles|build-console/u);
-  const packageRecord = parseReleaseRecord(
-    JSON.parse(
-      execFileSync('tar', ['-xOf', packagePath, './release-record.json'], { encoding: 'utf8' }),
-    ),
-  );
-  expect(packageRecord.profile).toEqual(entry.profile);
-  expect(packageRecord.artifactDigest).toBe(previewRecord.artifactDigest);
-  expect(packageRecord.buildId).toBe(previewRecord.buildId);
-  verifyConsolePackage(packagePath, (unpacked) => {
-    const artifact = verifyConsoleArtifact(unpacked);
-    expect(artifact.record.artifactDigest).toBe(previewRecord.artifactDigest);
-    expect(artifact.report.enabledModules).toEqual(['modelCatalog', 'chat']);
-    expect(artifact.report.excludedModules).toEqual(['imageStudio', 'videoStudio']);
-    expect(
-      artifact.report.files.every((file) =>
-        file.owners.every((owner) => owner !== 'imageStudio' && owner !== 'videoStudio'),
-      ),
-    ).toBe(true);
-  });
-  const reportDownloaded = page.waitForEvent('download');
-  await page.getByRole('link', { name: '下载裁剪报告', exact: true }).click();
-  const reportDownload = await reportDownloaded;
-  const reportPath = testInfo.outputPath(reportDownload.suggestedFilename());
-  await reportDownload.saveAs(reportPath);
-  const report = parsePruningReport(JSON.parse(readFileSync(reportPath, 'utf8')));
-  expect(report.buildId).toBe(packageRecord.buildId);
-  expect(report.excludedModules).toEqual(['imageStudio', 'videoStudio']);
-  // Saving a later configuration must not change an already completed build.
-  await page.getByRole('checkbox', { name: '图片生成', exact: true }).check();
-  const saved = page.waitForResponse(
-    (saveResponse) =>
-      saveResponse.url().endsWith(`/api/profiles/${profileId}`) &&
-      saveResponse.request().method() === 'PUT',
-  );
-  await page.getByRole('button', { name: '保存配置', exact: true }).click();
-  expect((await saved).ok()).toBe(true);
-  await preview.reload();
-  await expect(preview.getByTestId('route-not-found')).toBeVisible();
-  const immutableRecord = parseReleaseRecord(
-    await (await preview.request.get(new URL('/release-record.json', preview.url()).href)).json(),
-  );
-  expect(immutableRecord.profile.modules.imageStudio).toBe(false);
-  expect(immutableRecord.artifactDigest).toBe(packageRecord.artifactDigest);
-  expect(runtimeErrors).toEqual([]);
-  // Every later access must reject external edits, including an already started preview.
-  writeFileSync(resolve('dist/.console', job.id, 'site/index.html'), '<html>tampered later</html>');
-  expect((await page.request.get(`/api/builds/${job.id}/package`)).status()).toBe(500);
-  expect((await page.request.get(`/api/builds/${job.id}/pruning-report`)).status()).toBe(500);
-  expect((await preview.request.get(new URL('/index.html', preview.url()).href)).status()).toBe(
-    409,
-  );
+  await expect(page.getByTestId('build-result')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('status')).toContainText('打包完成');
+  await page.screenshot({ path: info.outputPath('visual-packaging-desktop.png'), fullPage: true });
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('link', { name: '下载交付包' }).click();
+  const download = await downloadEvent;
+  const file = info.outputPath('delivery.tar.gz');
+  await download.saveAs(file);
+  const hash = sha256(readFileSync(file));
+  const reportEvent = page.waitForEvent('download');
+  await page.getByRole('link', { name: '下载审计报告', exact: true }).click();
+  const report = await reportEvent;
+  const reportFile = info.outputPath('audit.json');
+  await report.saveAs(reportFile);
+  const audit = JSON.parse(readFileSync(reportFile, 'utf8')) as {
+    enterpriseId: string;
+    releaseId: string;
+    enabledModules: string[];
+    files: unknown[];
+  };
+  expect(audit.enterpriseId).toBe('ui-delivery');
+  expect(audit.releaseId).toBe(started.job.id);
+  expect(audit.enabledModules).toEqual(['orders']);
+  expect(audit.files).toHaveLength(5);
+  const previewEvent = context.waitForEvent('page');
+  await page.getByRole('link', { name: '预览此版本' }).click();
+  const preview = await previewEvent;
+  await expect(preview.getByRole('heading', { name: '订单管理', exact: true })).toBeVisible();
+  await expect(preview.getByRole('link', { name: '经营报表' })).toHaveCount(0);
+  await expect(preview.getByRole('button', { name: '导出订单' })).toHaveCount(0);
+  await preview.close();
+  await page.getByRole('checkbox', { name: '经营报表', exact: true }).check();
+  const unchangedEvent = page.waitForEvent('download');
+  await page.getByRole('link', { name: '下载交付包' }).click();
+  const unchanged = await unchangedEvent;
+  const second = info.outputPath('unchanged.tar.gz');
+  await unchanged.saveAs(second);
+  expect(sha256(readFileSync(second))).toBe(hash);
+  expect(errors).toEqual([]);
 });
 
-test('配置页在窄屏仍可操作且无横向溢出', async ({ page }) => {
+test('390px layout and keyboard selection work with reduced motion', async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByTestId('console-form')).toBeVisible();
-  await expect(page.getByRole('combobox', { name: '企业配置', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '保存并构建', exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
+  await page.getByRole('combobox', { name: '企业配置', exact: true }).selectOption('enterprise-b');
+  const checkbox = page.getByRole('checkbox', { name: '经营报表', exact: true });
+  await checkbox.focus();
+  await checkbox.press('Space');
+  await expect(checkbox).toBeChecked();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: info.outputPath('visual-packaging-mobile.png'), fullPage: true });
 });
