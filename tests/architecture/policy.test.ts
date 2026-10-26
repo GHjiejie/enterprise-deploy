@@ -20,6 +20,22 @@ afterEach(() => current?.dispose());
 const setup = () => (current = fixture()).root;
 
 describe('enterprise policy', () => {
+  it('normalizes a copied selection and accepts an already validated frozen profile', () => {
+    const selected = ['reports', 'orders'];
+    const input = {
+      schemaVersion: 1,
+      enterpriseId: 'copy-test',
+      enabledModules: selected,
+      brandingId: 'brand-a',
+    };
+    const profile = parseEnterprise(input, 'copy-test');
+    expect(selected).toEqual(['reports', 'orders']);
+    expect(Object.isFrozen(selected)).toBe(false);
+    expect(profile.enabledModules).toEqual(['orders', 'reports']);
+    expect(Object.isFrozen(profile.enabledModules)).toBe(true);
+    expect(profile.enabledModules).not.toBe(selected);
+    expect(parseEnterprise(profile, 'copy-test')).toEqual(profile);
+  });
   it('defaults to rejection and rejects unknown fields, duplicates and missing dependencies', () => {
     const root = setup();
     expect(() => loadPolicy(root, undefined)).toThrow('explicit enterprise required');

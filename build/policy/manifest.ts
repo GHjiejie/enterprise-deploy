@@ -20,7 +20,7 @@ export function parseEnterprise(value: unknown, expectedId: string): Enterprise 
   if (raw.schemaVersion !== 1) throw new Error('UNSUPPORTED_SCHEMA: enterprise');
   const enterpriseId = identifier(raw.enterpriseId, 'enterpriseId');
   if (enterpriseId !== expectedId) throw new Error('ENTERPRISE_ID_MISMATCH');
-  const enabledModules = strings(raw.enabledModules, 'enabledModules').sort();
+  const enabledModules = [...strings(raw.enabledModules, 'enabledModules')].sort();
   if (!enabledModules.length) throw new Error('EMPTY_MODULE_SELECTION');
   enabledModules.forEach((id) => identifier(id, 'module'));
   return Object.freeze({

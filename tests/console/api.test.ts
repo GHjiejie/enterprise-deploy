@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import { buildPaths, parseAudit } from '../../build/audit/record';
-import { loadPolicy } from '../../build/policy/manifest';
+import { enterpriseIds, loadPolicy } from '../../build/policy/manifest';
 import { parseBootstrap, parseJob, parseStarted } from '../../build/console/contracts';
 import { createBuildConsole } from '../../build/console/server';
 import { sha256 } from '../../build/utils';
@@ -35,7 +35,7 @@ describe('local console API and real build', () => {
       'order-detail',
     ]);
     expect(data.brands).toHaveLength(2);
-    expect(data.enterprises).toHaveLength(3);
+    expect(data.enterprises).toHaveLength(enterpriseIds(project.root).length);
     expect(
       (
         await fetch(`${app.origin}/api/bootstrap`, {
@@ -104,6 +104,43 @@ describe('local console API and real build', () => {
       }),
     });
     expect(invalid.status).toBe(400);
+  });
+
+  it('accepts and packages a 31-capability custom enterprise through repeated validation', async () => {
+    const bootstrap = parseBootstrap(await (await fetch(`${app.origin}/api/bootstrap`)).json());
+    const selected = bootstrap.modules
+      .filter((item) => ['orders', 'inventory'].includes(item.groupId))
+      .map((item) => item.id)
+      .concat(['access', 'access-sms-login', 'resource-sms'])
+      .sort();
+    expect(selected).toHaveLength(31);
+    const response = await fetch(`${app.origin}/api/builds`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        profile: {
+          schemaVersion: 1,
+          enterpriseId: 'api-multi-build',
+          enabledModules: selected,
+          brandingId: 'brand-a',
+        },
+        expectedRevision: null,
+        mode: 'production',
+      }),
+    });
+    expect(response.status).toBe(202);
+    const started = parseStarted(await response.json());
+    let job = started.job;
+    const deadline = Date.now() + 30000;
+    while (job.status === 'running' && Date.now() < deadline) {
+      await new Promise<void>((done) => setTimeout(done, 100));
+      job = parseJob(await (await fetch(`${app.origin}/api/builds/${job.id}`)).json());
+    }
+    expect(job.status, job.log).toBe('succeeded');
+    expect([...(job.result?.enabledModules ?? [])].sort()).toEqual(selected);
+    const archive = await fetch(`${app.origin}/api/builds/${job.id}/package`);
+    expect(archive.status).toBe(200);
+    expect(sha256(new Uint8Array(await archive.arrayBuffer()))).toBe(job.result?.packageHash);
   });
 
   it('builds an immutable snapshot, verifies downloads, previews it and retains history after restart', async () => {
