@@ -11,7 +11,21 @@ export const STAGE_LABELS: Readonly<Record<BuildStage, string>> = {
   verifying: '封包复验',
 };
 
+export const CAPABILITY_KINDS = ['module', 'action', 'field', 'column', 'tab', 'resource'] as const;
+export type CapabilityKind = (typeof CAPABILITY_KINDS)[number];
+export const CAPABILITY_LABELS: Readonly<Record<CapabilityKind, string>> = {
+  module: '业务模块',
+  action: '按钮与操作',
+  field: '表单字段',
+  column: '表格列',
+  tab: '详情页签',
+  resource: '外部资源（Mock）',
+};
+
 export interface ModuleSummary {
+  readonly kind: CapabilityKind;
+  readonly groupId: string;
+  readonly section: string;
   readonly id: string;
   readonly title: string;
   readonly description: string;
@@ -142,6 +156,9 @@ export function parseBootstrap(value: unknown): Bootstrap {
       const data = object(item);
       return {
         id: string(data.id),
+        kind: capabilityKind(data.kind),
+        groupId: string(data.groupId),
+        section: string(data.section),
         title: string(data.title),
         description: string(data.description),
         requires: array(data.requires, string),
@@ -191,4 +208,10 @@ export function draftErrors(
         );
   }
   return [...new Set(errors)];
+}
+
+function capabilityKind(value: unknown): CapabilityKind {
+  const kind = CAPABILITY_KINDS.find((kind) => kind === value);
+  if (!kind) throw new Error('能力类型无效');
+  return kind;
 }

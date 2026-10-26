@@ -29,7 +29,10 @@ describe('production delivery', () => {
   afterAll(project.dispose);
 
   it('builds A and B concurrently without mixed registries, brands or outputs', () => {
-    expect(a.enabledModules).toEqual(['orders', 'order-export', 'reports']);
+    expect(a.enabledModules).toHaveLength(120);
+    expect(a.enabledModules).toEqual(
+      loadPolicy(project.root, 'enterprise-a').selected.map((item) => item.id),
+    );
     expect(b.enabledModules).toEqual(['orders']);
     expect(a.contexts.filter((item) => item.kind === 'worker')).toHaveLength(1);
     expect(b.contexts.filter((item) => item.kind === 'worker')).toHaveLength(0);
@@ -39,10 +42,12 @@ describe('production delivery', () => {
     ).toBe(true);
     for (const item of b.contexts)
       for (const input of item.modules)
-        expect(['reports', 'order-export', 'brand-a']).not.toContain(input.owner);
+        if (input.kind === 'business') expect(input.owner).toBe('orders');
+        else expect(input.owner).not.toBe('brand-a');
     for (const file of b.files)
       for (const input of file.inputs)
-        expect(['reports', 'order-export', 'brand-a']).not.toContain(input.owner);
+        if (input.kind === 'business') expect(input.owner).toBe('orders');
+        else expect(input.owner).not.toBe('brand-a');
     expect(auditBuild(project.root, 'enterprise-b', 'test-b').siteHash).toBe(b.siteHash);
     const businessText = b.files
       .filter((file) => file.path.endsWith('.js') || file.path.endsWith('.css'))
@@ -53,7 +58,9 @@ describe('production delivery', () => {
         ),
       )
       .join('\n');
-    expect(businessText).not.toMatch(/经营报表|导出订单|report\.read|order\.export/u);
+    expect(businessText).not.toMatch(
+      /库存盘点|盘点复核|差异过账|经营报表|导出订单|库存调拨|调整库存|审批中心|操作审计|新建订单|跟进备注|report\.read|order\.export|inventory\.transfer|approval\.(?:approve|reject|review)/u,
+    );
     const site = resolve(buildPaths(project.root, 'enterprise-b', 'test-b').release, 'site');
     expect(filesIn(site).every((file) => !file.includes('audit') && !file.endsWith('.map'))).toBe(
       true,
@@ -369,13 +376,77 @@ describe('HTML output boundary', () => {
 });
 
 describe('feature combinations and environment isolation', () => {
-  it('builds every valid nonempty capability combination and both release modes', async () => {
+  it('builds representative base, nested and action capability combinations and both release modes', async () => {
     const combinations = [
       ['orders'],
+      ['orders', 'onboarding'],
       ['reports'],
       ['orders', 'reports'],
       ['orders', 'order-export'],
       ['orders', 'reports', 'order-export'],
+      ['orders', 'order-detail', 'order-notes'],
+      ['inventory'],
+      [
+        'inventory',
+        'inventory-transfer',
+        'inventory-transfer-field-source',
+        'inventory-transfer-field-target',
+        'inventory-transfer-field-quantity',
+        'inventory-transfer-field-reason',
+      ],
+      ['approvals'],
+      [
+        'approvals',
+        'approval-submit',
+        'approval-field-title',
+        'approval-field-applicant',
+        'approval-field-amount',
+        'approval-detail',
+        'approval-history',
+      ],
+      ['audit-log'],
+      ['approvals', 'approval-approve'],
+      ['approvals', 'approval-review'],
+      ['approvals', 'approval-reject', 'approval-reject-field-reason'],
+      ['orders', 'order-column-customer'],
+      ['orders', 'order-create', 'order-field-customer', 'order-field-amount'],
+      ['orders', 'order-detail'],
+      [
+        'inventory',
+        'inventory-adjust',
+        'inventory-adjust-field-quantity',
+        'inventory-adjust-field-reason',
+      ],
+      ['approvals', 'approval-approve', 'approval-approve-field-comment'],
+      ['approvals', 'approval-review', 'approval-review-field-comment'],
+      ['inventory', 'stocktakes'],
+      [
+        'inventory',
+        'stocktakes',
+        'stocktake-create',
+        'stocktake-create-field-title',
+        'stocktake-create-field-warehouse',
+      ],
+      [
+        'inventory',
+        'stocktakes',
+        'stocktake-create',
+        'stocktake-create-field-title',
+        'stocktake-create-field-warehouse',
+        'stocktake-create-field-note',
+      ],
+      [
+        'inventory',
+        'stocktakes',
+        'stocktake-detail',
+        'stocktake-detail-lines',
+        'stocktake-count',
+        'stocktake-count-field-quantity',
+        'stocktake-count-field-reason',
+      ],
+      ['inventory', 'stocktakes', 'stocktake-post'],
+      ['inventory', 'stocktakes', 'stocktake-approve'],
+      ['inventory', 'stocktakes', 'stocktake-approve', 'stocktake-approve-field-comment'],
     ];
     for (const [index, modules] of combinations.entries()) {
       const project = fixture();
@@ -390,6 +461,53 @@ describe('feature combinations and environment isolation', () => {
           `combination-${index}`,
         );
         expect(audit.enabledModules.slice().sort()).toEqual(modules.slice().sort());
+        if (
+          modules.includes('approval-approve') ||
+          modules.includes('approval-review') ||
+          modules.includes('approval-reject')
+        ) {
+          const text = audit.files
+            .filter((file) => file.path.endsWith('.js'))
+            .map((file) =>
+              readFileSync(
+                resolve(
+                  buildPaths(project.root, 'enterprise-a', `combination-${index}`).site,
+                  file.path,
+                ),
+                'utf8',
+              ),
+            )
+            .join('\n');
+          if (!modules.includes('approval-reject')) expect(text).not.toContain('驳回原因');
+          if (!modules.includes('approval-review')) expect(text).not.toContain('确认复核通过');
+          if (!modules.includes('approval-approve')) expect(text).not.toContain('确认初审');
+        }
+        const deliveredText = audit.files
+          .filter((file) => file.path.endsWith('.js'))
+          .map((file) =>
+            readFileSync(
+              resolve(
+                buildPaths(project.root, 'enterprise-a', `combination-${index}`).site,
+                file.path,
+              ),
+              'utf8',
+            ),
+          )
+          .join('\n');
+        for (const [id, marker] of [
+          ['approval-approve-field-comment', '初审意见须为不超过 200 字的文本。'],
+          ['approval-review-field-comment', '复核意见须为不超过 200 字的文本。'],
+          ['inventory-transfer-field-target', '请选择同一商品的其他目标仓。'],
+          ['inventory-transfer-field-source', '请选择有效的源仓商品。'],
+          ['stocktake-create-field-note', '盘点备注须为不超过 200 字的文本。'],
+          ['stocktake-approve-field-comment', '盘点复核说明最多输入 200 字。'],
+          ['stocktake-post', '只有复核通过的盘点单可以差异过账。'],
+          ['onboarding', '正在定位功能位置…'],
+          ['stocktake-count-field-reason', '实盘数与账面数不同，必须说明差异原因。'],
+        ]) {
+          if (modules.includes(id ?? '')) expect(deliveredText).toContain(marker);
+          else expect(deliveredText).not.toContain(marker);
+        }
         const allowed = new Set(modules);
         expect(
           audit.contexts
@@ -397,6 +515,9 @@ describe('feature combinations and environment isolation', () => {
             .filter((item) => item.kind === 'business')
             .every((item) => allowed.has(item.owner)),
         ).toBe(true);
+        for (const file of audit.files)
+          for (const input of file.inputs)
+            if (input.kind === 'business') expect(allowed.has(input.owner)).toBe(true);
       } finally {
         project.dispose();
       }
@@ -415,5 +536,5 @@ describe('feature combinations and environment isolation', () => {
     } finally {
       project.dispose();
     }
-  });
+  }, 180000);
 });

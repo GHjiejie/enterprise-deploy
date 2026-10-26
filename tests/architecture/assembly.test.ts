@@ -1,9 +1,16 @@
+import type { ModuleContext } from '../../src/contracts/operations';
+import { createActivityBus } from '../../src/core/activity';
 import { describe, expect, it } from 'vitest';
 import { ref } from 'vue';
 import type { FeatureModule, FeatureRoute } from '../../src/contracts/feature';
 import { activateModules, assembleModules } from '../../src/composition/assemble';
 import { permitted } from '../../src/core/runtime';
 import { toCsv } from '../../src/modules/order-export/csv';
+
+const moduleContext: ModuleContext = {
+  activity: createActivityBus(() => 'test'),
+  provide: () => {},
+};
 
 const route: FeatureRoute = {
   name: 'orders',
@@ -90,7 +97,7 @@ describe('runtime assembly', () => {
         };
       },
     }));
-    const dispose = await activateModules(modules);
+    const dispose = await activateModules(modules, moduleContext);
     expect(calls).toEqual(['start:a', 'start:b']);
     dispose();
     dispose();
@@ -100,36 +107,42 @@ describe('runtime assembly', () => {
   it('cleans earlier modules after failed activation and continues cleanup after a disposer fails', async () => {
     const calls: string[] = [];
     await expect(
-      activateModules([
+      activateModules(
+        [
+          {
+            id: 'a',
+            activate: () => () => {
+              calls.push('a');
+            },
+          },
+          {
+            id: 'b',
+            activate: () => {
+              throw new Error('failed');
+            },
+          },
+        ],
+        moduleContext,
+      ),
+    ).rejects.toThrow('failed');
+    expect(calls).toEqual(['a']);
+    const dispose = await activateModules(
+      [
         {
           id: 'a',
           activate: () => () => {
-            calls.push('a');
+            calls.push('again');
           },
         },
         {
           id: 'b',
-          activate: () => {
-            throw new Error('failed');
+          activate: () => () => {
+            throw new Error('dispose');
           },
         },
-      ]),
-    ).rejects.toThrow('failed');
-    expect(calls).toEqual(['a']);
-    const dispose = await activateModules([
-      {
-        id: 'a',
-        activate: () => () => {
-          calls.push('again');
-        },
-      },
-      {
-        id: 'b',
-        activate: () => () => {
-          throw new Error('dispose');
-        },
-      },
-    ]);
+      ],
+      moduleContext,
+    );
     expect(dispose).toThrow('MODULE_DISPOSE_FAILED');
     expect(calls).toEqual(['a', 'again']);
   });

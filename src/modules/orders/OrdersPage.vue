@@ -1,29 +1,61 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Order } from '../../contracts/feature';
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue';
+import { orderWorkspaceKey } from '../../contracts/operations';
+import type { OrderActions, OrderRowContext } from '../../contracts/operations';
+import ExtensionPoint from '../../shared/ExtensionPoint.vue';
 import { useRuntime } from '../../core/runtime';
+import { useColumns } from '../../shared/useColumns';
 import { currency } from '../../shared/format';
 import { listOrders } from './api';
 import './orders.css';
 
 const runtime = useRuntime();
-const orders = ref<readonly Order[]>([]);
+const columns = useColumns('orders');
+const workspace = inject(orderWorkspaceKey);
+if (!workspace) throw new Error('ORDER_WORKSPACE_NOT_PROVIDED');
+const { orders, loaded, replace } = workspace;
 const selection = ref<string[]>([]);
 const query = ref('');
+const stateFilter = ref('全部');
 const status = ref<'loading' | 'ready' | 'error'>('loading');
 let controller: AbortController | undefined;
 const filtered = computed(() =>
-  orders.value.filter((order) => `${order.id} ${order.customer}`.includes(query.value.trim())),
+  orders.value.filter(
+    (order) =>
+      `${order.id} ${order.customer}`.toLowerCase().includes(query.value.trim().toLowerCase()) &&
+      (stateFilter.value === '全部' || order.status === stateFilter.value),
+  ),
 );
 const selectedOrders = computed(() =>
   orders.value.filter((order) => selection.value.includes(order.id)),
 );
 const tools = computed(() =>
-  runtime.orderTools.filter(({ owner, value }) => runtime.can(owner, value.permission)),
+  status.value === 'ready'
+    ? runtime.orderTools.filter(({ owner, value }) => runtime.can(owner, value.permission))
+    : [],
+);
+const actions = computed<OrderActions>(() => ({
+  orders: orders.value,
+  selectedOrders: selectedOrders.value,
+  replace,
+  clearSelection: () => {
+    selection.value = [];
+  },
+}));
+const rowContext = (order: OrderRowContext['order']): OrderRowContext => ({
+  ...actions.value,
+  order,
+});
+const hasRowActions = computed(() =>
+  runtime.extensions.orderRows.some(({ owner, value }) => runtime.can(owner, value.permission)),
 );
 const total = computed(() => orders.value.reduce((sum, order) => sum + order.amount, 0));
 
 async function load(): Promise<void> {
+  if (loaded.value) {
+    status.value = 'ready';
+    return;
+  }
   controller?.abort();
   const request = new AbortController();
   controller = request;
@@ -31,7 +63,8 @@ async function load(): Promise<void> {
   try {
     const result = await listOrders(request.signal);
     if (request.signal.aborted) return;
-    orders.value = result;
+    replace(result);
+    loaded.value = true;
     selection.value = [];
     status.value = 'ready';
   } catch {
@@ -88,9 +121,30 @@ onBeforeUnmount(() => controller?.abort());
             v-for="tool in tools"
             :is="tool.value.component"
             :key="tool.value.id"
-            :context="{ selectedOrders }"
+            :context="actions"
           />
         </div>
+      </div>
+      <div class="filter-bar">
+        <label
+          >订单状态
+          <select v-model="stateFilter" aria-label="订单状态">
+            <option>全部</option>
+            <option>待处理</option>
+            <option>已完成</option>
+          </select></label
+        ><button v-if="selection.length" class="secondary compact" @click="selection = []">
+          清空选择</button
+        ><button
+          v-if="query || stateFilter !== '全部'"
+          class="secondary compact"
+          @click="
+            query = '';
+            stateFilter = '全部';
+          "
+        >
+          重置筛选
+        </button>
       </div>
       <div v-if="status === 'loading'" class="table-state" role="status">正在加载订单…</div>
       <div v-else-if="status === 'error'" class="table-state" role="alert">
@@ -105,9 +159,10 @@ onBeforeUnmount(() => controller?.abort());
             <tr>
               <th scope="col">选择</th>
               <th scope="col">订单编号</th>
-              <th scope="col">客户</th>
-              <th scope="col">订单金额</th>
-              <th scope="col">状态</th>
+              <th v-for="column in columns" :key="column.value.id" scope="col">
+                {{ column.value.title }}
+              </th>
+              <th v-if="hasRowActions" scope="col">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -121,12 +176,13 @@ onBeforeUnmount(() => controller?.abort());
                 />
               </td>
               <td class="order-id">{{ order.id }}</td>
-              <td>{{ order.customer }}</td>
-              <td>{{ currency(order.amount) }}</td>
-              <td>
-                <span :class="['order-status', { pending: order.status === '待处理' }]">{{
-                  order.status
-                }}</span>
+              <td v-for="column in columns" :key="column.value.id">
+                <component :is="column.value.component" :context="rowContext(order)" />
+              </td>
+              <td v-if="hasRowActions">
+                <div class="inline-actions">
+                  <ExtensionPoint slot="orderRows" :context="rowContext(order)" />
+                </div>
               </td>
             </tr>
           </tbody>

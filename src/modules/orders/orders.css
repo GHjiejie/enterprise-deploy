@@ -20,15 +20,3 @@
   font-variant-numeric: tabular-nums;
   color: #35445d;
 }
-.order-status {
-  display: inline-block;
-  padding: 5px 10px;
-  color: #257d5a;
-  background: #edf8f2;
-  border-radius: 6px;
-  font-size: 12px;
-}
-.order-status.pending {
-  background: #fff5e8;
-  color: #a96918;
-}

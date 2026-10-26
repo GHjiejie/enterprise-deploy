@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import CapabilitySummary from './CapabilitySummary.vue';
 import { STAGES, STAGE_LABELS } from '../../build/console/contracts';
 import type { BuildJob, ModuleSummary } from '../../build/console/contracts';
 
@@ -36,7 +37,6 @@ const elapsed = computed(() =>
       )
     : 0,
 );
-const title = (id: string): string => props.modules.find((item) => item.id === id)?.title ?? id;
 watch(
   () => props.job?.log,
   async () => {
@@ -51,7 +51,7 @@ watch(
 
 <template>
   <section class="surface build-panel" aria-label="打包任务">
-    <div class="section-heading">
+    <div class="section-heading" data-guide="console-build">
       <div>
         <span class="section-index">03</span>
         <h2>构建与交付</h2>
@@ -118,19 +118,14 @@ watch(
         </div>
         <div>
           <strong>{{ job.result.enabledModules.length }}</strong
-          ><small>启用模块</small>
+          ><small>启用能力</small>
         </div>
         <div>
           <strong>{{ job.result.excludedModules.length }}</strong
-          ><small>排除模块</small>
+          ><small>排除能力</small>
         </div>
       </div>
-      <p class="result-modules">
-        <span>已包含</span>{{ job.result.enabledModules.map(title).join('、') }}
-      </p>
-      <p v-if="job.result.excludedModules.length" class="result-modules">
-        <span>已排除</span>{{ job.result.excludedModules.map(title).join('、') }}
-      </p>
+      <CapabilitySummary :modules="modules" :selected="job.result.enabledModules" />
       <div class="artifact-actions">
         <a class="button primary" :href="`/api/builds/${job.id}/package`"
           >下载交付包 <span aria-hidden="true">↓</span></a

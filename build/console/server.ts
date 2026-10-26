@@ -196,6 +196,8 @@ export async function createBuildConsole(
           allow: [
             resolve(root, 'build-console'),
             resolve(root, 'build/console/contracts.ts'),
+            resolve(root, 'build/console/grouping.ts'),
+            resolve(root, 'src/shared/guide'),
             realpathSync(resolve(root, 'node_modules')),
             cacheDir,
           ],

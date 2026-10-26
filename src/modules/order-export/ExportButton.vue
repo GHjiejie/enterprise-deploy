@@ -4,6 +4,8 @@ import type { OrderToolContext } from '../../contracts/feature';
 import type { ExportResponse } from '../../contracts/export';
 import { prepareExport } from './api';
 import './export.css';
+import { useRuntime } from '../../core/runtime';
+const runtime = useRuntime();
 
 const props = defineProps<{ context: OrderToolContext }>();
 const state = ref<'idle' | 'submitting' | 'success' | 'failed'>('idle');
@@ -22,7 +24,12 @@ function cleanup(): void {
   objectUrl = undefined;
 }
 async function download(): Promise<void> {
-  if (state.value === 'submitting' || props.context.selectedOrders.length === 0) return;
+  if (
+    !runtime.can('order-export', 'order.export') ||
+    state.value === 'submitting' ||
+    props.context.selectedOrders.length === 0
+  )
+    return;
   cleanup();
   controller = new AbortController();
   const signal = controller.signal;
@@ -53,6 +60,12 @@ async function download(): Promise<void> {
     link.click();
     state.value = 'success';
     message.value = '订单已导出';
+    runtime.activity.publish({
+      area: '订单',
+      action: '导出订单',
+      subject: orders.map((item) => item.id).join('、'),
+      detail: `导出 ${orders.length} 笔订单`,
+    });
   } catch (error) {
     if (signal.aborted) return;
     state.value = 'failed';
@@ -67,6 +80,7 @@ onBeforeUnmount(cleanup);
 <template>
   <div class="export-control">
     <button
+      data-guide="tool:order-export-button"
       :disabled="context.selectedOrders.length === 0 || state === 'submitting'"
       :title="context.selectedOrders.length === 0 ? '请先选择订单' : '导出所选订单'"
       @click="download"

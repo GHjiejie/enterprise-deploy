@@ -15,6 +15,15 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report/console' }]],
   use: {
     baseURL: 'http://127.0.0.1:5194',
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: 'http://127.0.0.1:5194',
+          localStorage: [{ name: 'enterprise:guide:v1:build-console', value: 'dismissed' }],
+        },
+      ],
+    },
     browserName: 'chromium',
     headless: true,
     viewport: { width: 1440, height: 1000 },

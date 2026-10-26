@@ -7,6 +7,7 @@ import type { Persona, Runtime } from '../contracts/feature';
 import App from '../core/App.vue';
 import NotFound from '../core/NotFound.vue';
 import { permitted } from '../core/runtime';
+import { createActivityBus } from '../core/activity';
 import '../core/style.css';
 import { activateModules, assembleModules } from './assemble';
 
@@ -22,6 +23,11 @@ async function bootstrap(): Promise<void> {
   const runtime: Runtime = {
     menus: assembly.menus,
     orderTools: assembly.orderTools,
+    extensions: assembly.extensions,
+    formFields: assembly.formFields,
+    columns: assembly.columns,
+    detailTabs: assembly.detailTabs,
+    activity: createActivityBus(() => (runtime.persona.value === 'admin' ? '管理员' : '普通成员')),
     persona: ref<Persona>('admin'),
     permissions: assembly.permissions,
     licensedModules: ref<ReadonlySet<string>>(new Set(__BUILD_INFO__.modules)),
@@ -33,12 +39,20 @@ async function bootstrap(): Promise<void> {
   const router = createRouter({
     history: createWebHistory(),
     routes: [
-      { path: '/', name: 'home', redirect: assembly.routes[0]?.value.path ?? '/not-found' },
+      {
+        path: '/',
+        name: 'home',
+        redirect:
+          assembly.routes.find((item) => item.value.name === 'orders')?.value.path ??
+          assembly.routes.find((item) => item.value.layout !== 'standalone')?.value.path ??
+          assembly.routes[0]?.value.path ??
+          '/not-found',
+      },
       ...assembly.routes.map(({ owner, value }) => ({
         name: value.name,
         path: value.path,
         component: value.load,
-        meta: { owner, permission: value.permission },
+        meta: { owner, permission: value.permission, layout: value.layout ?? 'workspace' },
       })),
       { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
     ],
@@ -46,9 +60,16 @@ async function bootstrap(): Promise<void> {
   router.onError(() => {
     runtime.chunkError.value = '功能资源加载失败，当前版本可能已更新。请刷新页面后重试。';
   });
-  const dispose = await activateModules(modules);
-  window.addEventListener('pagehide', dispose, { once: true });
   const app = createApp(App);
+  const dispose = await activateModules(modules, {
+    activity: runtime.activity,
+    provide: (key, value) => {
+      app.provide(key, value);
+    },
+  });
+  window.addEventListener('pagehide', (event) => {
+    if (!event.persisted) dispose();
+  });
   app.provide(runtimeKey, runtime);
   app.use(router);
   app.mount('#app');

@@ -1,0 +1,18 @@
+.invoice-paper {
+  padding: 26px 20px;
+  border: 1px solid #ead9d8;
+  color: #80535a;
+}
+.invoice-paper h3 {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 4px;
+  border-bottom: 2px solid #d9b6b6;
+  padding-bottom: 20px;
+}
+.invoice-paper dl {
+  padding: 20px 0;
+}
+.invoice-paper p {
+  font-size: 12px;
+}

@@ -22,6 +22,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm run test:console
+      - run: npm run test:external
       - uses: actions/upload-artifact@v4
         if: always()
         with:

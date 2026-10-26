@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useRuntime } from './runtime';
+import ExtensionPoint from '../shared/ExtensionPoint.vue';
 
 const runtime = useRuntime();
 const route = useRoute();
@@ -20,10 +21,19 @@ const allowed = computed(
     runtime.can(route.meta.owner, route.meta.permission),
 );
 const reload = (): void => window.location.reload();
+const standalone = computed(() => route.meta.layout === 'standalone');
 </script>
 
 <template>
-  <div class="workspace">
+  <div v-if="standalone" class="standalone-page">
+    <RouterView v-if="allowed" />
+    <section v-else class="state-panel">
+      <h1>没有访问权限</h1>
+      <p>当前身份无法访问此页面。</p>
+    </section>
+    <ExtensionPoint slot="shellFooter" :context="{}" />
+  </div>
+  <div v-else class="workspace">
     <aside class="sidebar">
       <RouterLink to="/" class="brand"
         ><span class="brand-mark">E</span
@@ -33,7 +43,11 @@ const reload = (): void => window.location.reload();
       >
       <p class="nav-label">工作空间</p>
       <nav aria-label="主导航">
-        <RouterLink v-for="menu in menus" :key="menu.value.id" :to="{ name: menu.value.routeName }"
+        <RouterLink
+          v-for="menu in menus"
+          :key="menu.value.id"
+          :to="{ name: menu.value.routeName }"
+          :data-guide="`menu:${menu.value.id}`"
           >{{ menu.value.title }}<span aria-hidden="true">↗</span></RouterLink
         >
       </nav>
@@ -47,13 +61,16 @@ const reload = (): void => window.location.reload();
     <div class="main-column">
       <header class="topbar">
         <span class="breadcrumb">工作空间 <span>/</span> {{ activeTitle }}</span>
-        <label class="persona"
-          >演示权限<select v-model="persona" aria-label="演示权限">
-            <option value="admin">管理员</option>
-            <option value="member">普通成员</option>
-            <option value="none">无权限</option>
-          </select></label
-        >
+        <div class="topbar-actions">
+          <ExtensionPoint slot="shellTools" :context="{}" />
+          <label class="persona"
+            >演示权限<select v-model="persona" aria-label="演示权限">
+              <option value="admin">管理员</option>
+              <option value="member">普通成员</option>
+              <option value="none">无权限</option>
+            </select></label
+          >
+        </div>
       </header>
       <main>
         <div class="demo-note">
@@ -70,6 +87,7 @@ const reload = (): void => window.location.reload();
           <p>当前身份或企业服务许可不允许访问此页面。</p>
         </section>
       </main>
+      <ExtensionPoint slot="shellFooter" :context="{}" />
       <footer class="build-footer">
         企业构建 {{ info.releaseId }}<span>仅装配本企业已批准能力</span>
       </footer>

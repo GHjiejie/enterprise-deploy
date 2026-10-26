@@ -30,9 +30,12 @@ describe('local console API and real build', () => {
 
   it('exposes only structured configuration and rejects foreign origins, hosts and missing session tokens', async () => {
     const data = parseBootstrap(await (await fetch(`${app.origin}/api/bootstrap`)).json());
-    expect(data.modules.map((item) => item.id)).toEqual(['orders', 'reports', 'order-export']);
+    expect(data.modules).toHaveLength(120);
+    expect(data.modules.find((item) => item.id === 'order-notes')?.requires).toEqual([
+      'order-detail',
+    ]);
     expect(data.brands).toHaveLength(2);
-    expect(data.enterprises).toHaveLength(2);
+    expect(data.enterprises).toHaveLength(3);
     expect(
       (
         await fetch(`${app.origin}/api/bootstrap`, {
@@ -136,7 +139,12 @@ describe('local console API and real build', () => {
     }
     expect(job.status, job.log).toBe('succeeded');
     expect(job.result?.enabledModules).toEqual(['orders']);
-    expect(job.result?.excludedModules.slice().sort()).toEqual(['order-export', 'reports']);
+    expect(job.result?.excludedModules.slice().sort()).toEqual(
+      loadPolicy(project.root, 'enterprise-a')
+        .catalog.map((item) => item.id)
+        .filter((id) => id !== 'orders')
+        .sort(),
+    );
     const archive = await fetch(`${app.origin}/api/builds/${job.id}/package`);
     expect(archive.status).toBe(200);
     expect(sha256(new Uint8Array(await archive.arrayBuffer()))).toBe(job.result?.packageHash);

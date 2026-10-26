@@ -1,0 +1,123 @@
+.assistant-workspace > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 28px;
+  border-bottom: 1px solid #edf0f5;
+}
+.assistant-workspace > header > div:nth-child(2) {
+  flex: 1;
+}
+.assistant-workspace > header p {
+  font-size: 11px;
+  color: #939eb0;
+  margin-top: 4px;
+}
+.assistant-logo {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 10px;
+  font-size: 25px;
+}
+.assistant-messages {
+  padding: 28px;
+  min-height: 350px;
+  max-height: 550px;
+  overflow: auto;
+}
+.assistant-welcome {
+  text-align: center;
+  max-width: 520px;
+  margin: 25px auto;
+}
+.assistant-welcome > span {
+  font-size: 45px;
+  color: var(--accent);
+}
+.assistant-welcome h2 {
+  font-size: 22px;
+  margin: 14px 0;
+}
+.assistant-welcome p {
+  font-size: 13px;
+  color: #929bad;
+}
+.assistant-welcome > div {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+.assistant-welcome button {
+  font-size: 11px;
+  padding: 10px;
+}
+.assistant-composer {
+  margin: 0 28px 24px;
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid #dce2ed;
+  border-radius: 10px;
+  padding: 12px;
+}
+.assistant-composer label {
+  flex: 1;
+  min-width: 180px;
+}
+.assistant-composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 50px;
+  max-height: 150px;
+  border: 0;
+  padding: 6px;
+  font: inherit;
+  font-size: 13px;
+  outline-offset: 1px;
+}
+.assistant-composer small {
+  width: 100%;
+  font-size: 10px;
+  color: #a2aaba;
+}
+.assistant-message {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: #f5f7fb;
+  max-width: 85%;
+}
+.assistant-message.user {
+  margin-left: auto;
+  background: var(--accent-soft);
+}
+.assistant-message small {
+  color: #8993a4;
+  font-size: 11px;
+}
+.assistant-message p {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .assistant-messages {
+    padding: 18px;
+  }
+  .assistant-composer {
+    margin: 0 16px 18px;
+  }
+  .assistant-message {
+    max-width: 95%;
+  }
+}

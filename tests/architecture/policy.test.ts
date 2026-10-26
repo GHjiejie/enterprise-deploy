@@ -50,7 +50,11 @@ describe('enterprise policy', () => {
   it('orders dependencies deterministically and detects cycles, conflicts and overlapping ownership', () => {
     const root = setup();
     const policy = loadPolicy(root, 'enterprise-a');
-    expect(policy.selected.map((item) => item.id)).toEqual(['orders', 'order-export', 'reports']);
+    expect(policy.selected).toHaveLength(120);
+    const ids = policy.selected.map((item) => item.id);
+    for (const module of policy.selected)
+      for (const dependency of module.requires)
+        expect(ids.indexOf(dependency)).toBeLessThan(ids.indexOf(module.id));
     expect(() =>
       selectModules(
         policy.catalog.map((item) =>
@@ -75,7 +79,9 @@ describe('enterprise policy', () => {
     const root = setup();
     const policy = loadPolicy(root, 'enterprise-b');
     expect(registrySource(policy)).toContain('/orders/index.ts');
-    expect(registrySource(policy)).not.toMatch(/reports|order-export/u);
+    expect(registrySource(policy)).not.toMatch(
+      /reports|order-export|inventory|approval|audit-log|order-notes/u,
+    );
     const evidence = scanSources(policy);
     expect(evidence.inputs.some((item) => item.owner === 'orders')).toBe(true);
     expect(

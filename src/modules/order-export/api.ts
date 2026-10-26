@@ -7,5 +7,5 @@ export async function prepareExport(
 ): Promise<readonly Order[]> {
   signal.throwIfAborted();
   if (!orders.length) throw new Error('请先选择订单');
-  return orders.map((order) => ({ ...order }));
+  return orders.map(({ id, customer, amount, status }) => ({ id, customer, amount, status }));
 }

@@ -5,6 +5,9 @@ import type { Bootstrap, BuildJob, ProfileEntry, ReleaseMode } from '../../build
 import type { Enterprise } from '../../build/policy/types';
 import { ApiError, bootstrap, getJob, saveProfile, startBuild } from './api';
 import JobPanel from './JobPanel.vue';
+import CapabilityManager from './CapabilityManager.vue';
+import CapabilitySummary from './CapabilitySummary.vue';
+import ConsoleGuide from './ConsoleGuide.vue';
 
 interface Draft {
   schemaVersion: 1;
@@ -54,8 +57,6 @@ const selectedModules = computed(
 const excludedModules = computed(
   () => data.value?.modules.filter((item) => !draft.value.enabledModules.includes(item.id)) ?? [],
 );
-const moduleTitle = (id: string): string =>
-  data.value?.modules.find((item) => item.id === id)?.title ?? id;
 
 function choose(id: string): void {
   const entry = data.value?.enterprises.find((item) => item.profile.enterpriseId === id);
@@ -95,13 +96,6 @@ async function confirmDiscard(): Promise<void> {
   pendingDiscard = undefined;
   discardDialog.value?.close();
   await action?.();
-}
-function toggle(id: string, event: Event): void {
-  if (!(event.target instanceof HTMLInputElement)) return;
-  draft.value.enabledModules = event.target.checked
-    ? [...draft.value.enabledModules, id]
-    : draft.value.enabledModules.filter((item) => item !== id);
-  message.value = '';
 }
 function upsertJob(value: BuildJob): void {
   jobs.value = [value, ...jobs.value.filter((item) => item.id !== value.id)]
@@ -242,7 +236,12 @@ onBeforeUnmount(() => {
       <a class="console-brand" href="/"
         ><span class="brand-symbol">E</span
         ><span>企业构建中心<small>ENTERPRISE DELIVERY</small></span></a
-      ><span class="local-badge"><i></i>本地工作空间</span>
+      >
+      <div class="console-header-actions">
+        <ConsoleGuide v-if="initial === 'ready'" /><span class="local-badge"
+          ><i></i>本地工作空间</span
+        >
+      </div>
     </header>
     <main class="console-main">
       <div class="page-heading">
@@ -280,6 +279,7 @@ onBeforeUnmount(() => {
                   <label
                     >企业配置<select
                       :value="selected"
+                      data-guide="console-enterprise"
                       aria-label="企业配置"
                       @change="selectEnterprise"
                     >
@@ -301,7 +301,11 @@ onBeforeUnmount(() => {
                       autocomplete="off"
                       spellcheck="false" /></label
                   ><label
-                    >企业品牌<select v-model="draft.brandingId" aria-label="企业品牌">
+                    >企业品牌<select
+                      data-guide="console-brand"
+                      v-model="draft.brandingId"
+                      aria-label="企业品牌"
+                    >
                       <option v-for="item in data.brands" :key="item.id" :value="item.id">
                         {{ item.name }} · {{ item.id }}
                       </option>
@@ -315,44 +319,14 @@ onBeforeUnmount(() => {
                 </div>
                 <p class="field-note">企业决定包含哪些能力，环境决定本次构建模式。</p>
               </section>
-              <section class="surface modules-section">
-                <div class="section-heading">
-                  <div>
-                    <span class="section-index">02</span>
-                    <h2>选择交付模块</h2>
-                  </div>
-                  <span class="selection-count"
-                    >已选 {{ selectedModules.length }} / {{ data.modules.length }}</span
-                  >
-                </div>
-                <p class="section-description">
-                  关闭模块时，其专属页面、处理逻辑、样式和资源一起排除。
-                </p>
-                <div class="module-grid">
-                  <label
-                    v-for="(module, index) in data.modules"
-                    :key="module.id"
-                    :class="['module-card', { selected: draft.enabledModules.includes(module.id) }]"
-                    ><div class="module-card-top">
-                      <span class="module-icon">{{ String(index + 1).padStart(2, '0') }}</span
-                      ><input
-                        type="checkbox"
-                        :aria-label="module.title"
-                        :checked="draft.enabledModules.includes(module.id)"
-                        @change="toggle(module.id, $event)"
-                      />
-                    </div>
-                    <h3>{{ module.title }}</h3>
-                    <p>{{ module.description }}</p>
-                    <span v-if="module.requires.length" class="dependency-note"
-                      >依赖 {{ module.requires.map(moduleTitle).join('、') }}</span
-                    ><span v-else class="dependency-note">可独立交付</span
-                    ><span class="module-switch-state">{{
-                      draft.enabledModules.includes(module.id) ? '已启用' : '不包含'
-                    }}</span></label
-                  >
-                </div>
-              </section>
+              <CapabilityManager
+                :modules="data.modules"
+                :selected="draft.enabledModules"
+                @change="
+                  draft.enabledModules = $event;
+                  message = '';
+                "
+              />
             </fieldset>
             <ul v-if="errors.length" class="validation-errors" aria-label="配置校验">
               <li v-for="item in errors" :key="item">{{ item }}</li>
@@ -364,7 +338,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <p v-if="message" class="save-message" role="status">{{ message }}</p>
-            <div class="form-actions">
+            <div class="form-actions" data-guide="console-actions">
               <p>
                 {{
                   activeJobId
@@ -390,7 +364,7 @@ onBeforeUnmount(() => {
         <aside class="summary-column">
           <section class="surface delivery-summary">
             <p class="eyebrow">DELIVERY PREVIEW</p>
-            <h2>本次交付配置</h2>
+            <h2 data-guide="console-summary">本次交付配置</h2>
             <p class="summary-enterprise">{{ draft.enterpriseId || '待填写企业标识' }}</p>
             <div class="summary-meta">
               <span>品牌</span><strong>{{ brand?.name ?? '请选择' }}</strong
@@ -398,22 +372,8 @@ onBeforeUnmount(() => {
               ><strong>{{ mode === 'production' ? '生产环境' : '预发布环境' }}</strong>
             </div>
             <div class="summary-divider"></div>
-            <h3>
-              包含的能力 <span>{{ selectedModules.length }}</span>
-            </h3>
-            <ul class="module-summary included">
-              <li v-for="item in selectedModules" :key="item.id"><span>✓</span>{{ item.title }}</li>
-              <li v-if="!selectedModules.length" class="muted">尚未选择模块</li>
-            </ul>
-            <h3>
-              排除的能力 <span>{{ excludedModules.length }}</span>
-            </h3>
-            <ul class="module-summary excluded">
-              <li v-for="item in excludedModules" :key="item.id">
-                <span>－</span>{{ item.title }}
-              </li>
-              <li v-if="!excludedModules.length" class="muted">当前选择包含全部模块</li>
-            </ul>
+            <h3>已选 {{ selectedModules.length }} 项 · 排除 {{ excludedModules.length }} 项</h3>
+            <CapabilitySummary :modules="data.modules" :selected="draft.enabledModules" />
             <p class="summary-footnote">
               此处展示待构建配置。实际裁剪结果以完成后的审计与封包复验为准。
             </p>

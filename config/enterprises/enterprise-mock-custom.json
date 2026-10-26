@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "enterpriseId": "enterprise-mock-custom",
+  "enabledModules": [
+    "access",
+    "account",
+    "billing",
+    "operations",
+    "resource-sms",
+    "resource-cloudauth",
+    "resource-pay",
+    "resource-smtp",
+    "resource-feishu",
+    "resource-hermes",
+    "access-sms-login",
+    "account-enterprise-auth",
+    "billing-refund",
+    "billing-statement",
+    "operations-email-notify",
+    "operations-alert",
+    "operations-model"
+  ],
+  "brandingId": "brand-b"
+}

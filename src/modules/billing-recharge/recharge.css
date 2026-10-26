@@ -1,0 +1,8 @@
+.amount-presets {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.amount-presets button {
+  flex: 1;
+}
