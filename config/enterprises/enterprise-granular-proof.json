@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "enterpriseId": "enterprise-granular-proof",
+  "enabledModules": [
+    "orders",
+    "order-create",
+    "order-field-customer",
+    "order-field-amount",
+    "order-column-customer",
+    "order-column-status",
+    "order-detail",
+    "order-detail-overview",
+    "approvals",
+    "approval-submit",
+    "approval-field-title",
+    "approval-field-applicant",
+    "approval-field-amount",
+    "approval-field-urgency",
+    "approval-approve",
+    "approval-column-title",
+    "approval-column-status",
+    "approval-detail",
+    "approval-detail-overview",
+    "approval-history"
+  ],
+  "brandingId": "brand-b"
+}

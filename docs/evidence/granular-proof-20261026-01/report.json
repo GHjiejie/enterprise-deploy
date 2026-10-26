@@ -1,0 +1,984 @@
+{
+  "status": "passed",
+  "enterpriseId": "enterprise-granular-proof",
+  "releaseId": "granular-proof-20261026-01",
+  "referenceReleaseId": "granular-proof-20261026-01-full",
+  "sourceTreeHash": "196f5b1e7d0643fc7c87849ee3237b7e9f48c0787e7c9008924307658375442f",
+  "enabledCapabilities": [
+    "approval-approve",
+    "approval-column-status",
+    "approval-column-title",
+    "approval-detail",
+    "approval-detail-overview",
+    "approval-field-amount",
+    "approval-field-applicant",
+    "approval-field-title",
+    "approval-field-urgency",
+    "approval-history",
+    "approval-submit",
+    "approvals",
+    "order-column-customer",
+    "order-column-status",
+    "order-create",
+    "order-detail",
+    "order-detail-overview",
+    "order-field-amount",
+    "order-field-customer",
+    "orders"
+  ],
+  "catalogCount": 120,
+  "excludedCapabilityCount": 100,
+  "excludedCapabilities": [
+    {
+      "id": "reports",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-export",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-bulk-complete",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-priority",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-notes",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-adjust",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-transfer",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "audit-log",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-reject",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-review",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-field-reference",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-field-cost-center",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-column-amount",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-column-applicant",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-column-amount",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-column-quantity",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-column-reserved",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-column-available",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-column-status",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "order-detail-extra",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-detail-extra",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-adjust-field-quantity",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-adjust-field-reason",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-transfer-field-source",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-transfer-field-target",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-transfer-field-quantity",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "inventory-transfer-field-reason",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-approve-field-comment",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-reject-field-reason",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "approval-review-field-comment",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktakes",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-create-field-title",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-create-field-warehouse",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-create-field-note",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-count-field-quantity",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-count-field-reason",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-return-field-reason",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-cancel-field-reason",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-approve-field-comment",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-create",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-count",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-submit",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-approve",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-return",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-post",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-cancel",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-detail",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-column-warehouse",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-column-progress",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-column-difference",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-column-status",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-detail-lines",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-detail-history",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "stocktake-detail-extra",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "onboarding",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-sms",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-captcha",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-cloudauth",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-wechat",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-pay",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-wecom",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-smtp",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-oss",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-feishu",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "resource-hermes",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "access",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "billing",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "media",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "access-sms-login",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "access-sms-register",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "access-sms-recover",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-sms-mobile",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-sms-close",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "access-captcha",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-personal-auth",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-enterprise-auth",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "access-wechat-login",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-wechat-bind",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "billing-recharge",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "billing-refund",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "billing-statement",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-wecom-approval",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-wecom-login",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-wecom-password",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-email-notify",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-email-bind",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "account-avatar",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "media-image",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "media-video",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "media-export",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "billing-invoice",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-feedback",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-ticket",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-hermes-chat",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-alert",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "operations-model",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    },
+    {
+      "id": "company",
+      "sourceScanInputs": 0,
+      "graphInputs": 0,
+      "outputInputs": 0
+    }
+  ],
+  "implementationMarkers": [
+    {
+      "owner": "order-export",
+      "marker": "orders.csv",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "order-export",
+      "marker": "export-control",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "order-bulk-complete",
+      "marker": "确认批量完成",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "order-priority",
+      "marker": "取消加急",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "order-field-reference",
+      "marker": "客户参考号仅允许 1–40 位字母、数字和短横线。",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "order-notes",
+      "marker": "新增备注",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "approval-reject",
+      "marker": "驳回申请",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "approval-review",
+      "marker": "确认复核通过",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "approval-approve-field-comment",
+      "marker": "初审意见须为不超过 200 字的文本。",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "approval-field-cost-center",
+      "marker": "成本中心格式应为两个大写字母、短横线及三位数字，例如 RD-001。",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "reports",
+      "marker": "收入趋势示意",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "onboarding",
+      "marker": "正在定位功能位置…",
+      "foundInFull": true,
+      "foundInCustom": false
+    },
+    {
+      "owner": "stocktake-post",
+      "marker": "只有复核通过的盘点单可以差异过账。",
+      "foundInFull": true,
+      "foundInCustom": false
+    }
+  ],
+  "removedResources": [
+    {
+      "path": "assets/logo-BvT3jMFr.svg",
+      "bytes": 236,
+      "sha256": "fc30bdeb9d4fc4ac1deb076fae99757217aa1a7aebd26fca5eaf2cd09aefc8c0",
+      "owners": ["company"]
+    },
+    {
+      "path": "assets/mock-BBqpTJbr.svg",
+      "bytes": 333,
+      "sha256": "a8451fc6a34181d5a8240ac3b233ab7943d6b0ea084fcc606d00837bd541bbf6",
+      "owners": ["resource-captcha"]
+    },
+    {
+      "path": "assets/mock-BFH1wwtE.svg",
+      "bytes": 325,
+      "sha256": "4821c76655449468d2f20a19afee554c75de8423b1039b02c582d6dc819466ba",
+      "owners": ["resource-pay"]
+    },
+    {
+      "path": "assets/mock-CcTINlpd.svg",
+      "bytes": 337,
+      "sha256": "77c327eed1211d4f790da95690605f6d4402878fea6baa52afc52654290b573a",
+      "owners": ["resource-cloudauth"]
+    },
+    {
+      "path": "assets/mock-CCTLAlAo.svg",
+      "bytes": 322,
+      "sha256": "5f767e77323c41762c106937b6b077b313668d52788f8d70bfd1ceb93b48fafc",
+      "owners": ["resource-wecom"]
+    },
+    {
+      "path": "assets/mock-CgfEzHok.svg",
+      "bytes": 330,
+      "sha256": "134be951ada2d9d9d1856751460860197a593c4dd6aefa61ba14c1c679f2bba3",
+      "owners": ["resource-hermes"]
+    },
+    {
+      "path": "assets/mock-Ct9g8vbp.svg",
+      "bytes": 328,
+      "sha256": "cc6ac85857d2e6e583a1da57dde97daf1c4df88cd49d09b52a21d97f435106c0",
+      "owners": ["resource-smtp"]
+    },
+    {
+      "path": "assets/mock-DevZisUM.svg",
+      "bytes": 329,
+      "sha256": "263d6e62d62d6aa5279044ce0d33a2ef9e0e71e8f223b0b66f68208706453872",
+      "owners": ["resource-feishu"]
+    },
+    {
+      "path": "assets/mock-DzDd_wTV.svg",
+      "bytes": 325,
+      "sha256": "7f815eb342abbddb978e31eb45e16a2b66adcccb778955a4307a46f8ca3dd0b8",
+      "owners": ["resource-oss"]
+    },
+    {
+      "path": "assets/mock-JqZPh3lS.svg",
+      "bytes": 325,
+      "sha256": "504920dfc84892060005c5a7de762f0b22d11183fe058d2664713d2c03c09e17",
+      "owners": ["resource-sms"]
+    },
+    {
+      "path": "assets/mock-s3eimMg-.svg",
+      "bytes": 329,
+      "sha256": "2e98e9b7ea6d57ad265f747c3956b58c90659a7d14a33afa4f39a096a39546f0",
+      "owners": ["resource-wechat"]
+    },
+    {
+      "path": "assets/qr-BZvSzm7n.svg",
+      "bytes": 13404,
+      "sha256": "da0fe0177664058efbab0f6e32845567a6c9dab810cfe54f175d6809dab50084",
+      "owners": ["account-wechat-bind"]
+    },
+    {
+      "path": "assets/qr-Cb9RLyNQ.svg",
+      "bytes": 13914,
+      "sha256": "95ae5b6992c0dd55fc1708cb8c647c894f5967f4323bc15ce85ce0bdbf5e6eee",
+      "owners": ["operations-wecom-login"]
+    },
+    {
+      "path": "assets/qr-DiubADr2.svg",
+      "bytes": 14915,
+      "sha256": "ef883b302d4b3985e0ac11664852fcf7e0a4d18ccaf00c66f7cd96a90ea596b2",
+      "owners": ["access-wechat-login"]
+    },
+    {
+      "path": "assets/qr-DsbB3kod.svg",
+      "bytes": 15437,
+      "sha256": "505f0607fc0aee3a16c151efc13cf3e76bb70ff3e51e8347cea1c842422f1c43",
+      "owners": ["billing-recharge"]
+    },
+    {
+      "path": "assets/result-Bb3f7sCU.svg",
+      "bytes": 594,
+      "sha256": "dced740866c82a7b0f6eb3228cafcd6451bf661623135c7db164019ea7c838fa",
+      "owners": ["media-image"]
+    },
+    {
+      "path": "assets/revenue-Bwr8Ctb4.svg",
+      "bytes": 552,
+      "sha256": "d287d04aebb8c28b9f65779a90d098c2d88f96abc923ba9cd711848c4881d602",
+      "owners": ["reports"]
+    }
+  ],
+  "deliveredFiles": [
+    {
+      "path": "assets/Action-TleImahc.js",
+      "bytes": 2447,
+      "sha256": "50c8569e03dde47621d26e8350eaef8006e7900e00286b4658cb42aa10beabc8"
+    },
+    {
+      "path": "assets/ApprovalDetail-CUQzLr1X.js",
+      "bytes": 604,
+      "sha256": "a80e716a558618fdb35cef04fc95b4db364aced1d531bac40630c357247ee576"
+    },
+    {
+      "path": "assets/ApprovalHistory-CDBXXO4e.js",
+      "bytes": 469,
+      "sha256": "a1affacb6bf056d24d3657040103924acd3743ed5bbbcdf593ae57d1f3d28f36"
+    },
+    {
+      "path": "assets/ApprovalsPage-CmMc2Lzc.js",
+      "bytes": 3623,
+      "sha256": "a6780bd0bcafbb9551ba53e5be66a4cf1391a2793b11ce49f01e10fc2d8caf73"
+    },
+    {
+      "path": "assets/ApprovalSubmit-DfiS2ttH.js",
+      "bytes": 2176,
+      "sha256": "d8ba7f80ec282793c908033ca4353069bd7daf41f4db96f26045d515656b95a5"
+    },
+    {
+      "path": "assets/Cell-6pql7t0s.js",
+      "bytes": 265,
+      "sha256": "01ddffe859e5b21751c5923dbaf5ff138a73cd24355aa094a1268fed3157cb9c"
+    },
+    {
+      "path": "assets/Cell-BfTrVDyW.js",
+      "bytes": 263,
+      "sha256": "a6aa19a1d057912b265d4858cad9dd75bac2927c334373df6d7d3221f145599a"
+    },
+    {
+      "path": "assets/Cell-DTjCei8r.js",
+      "bytes": 218,
+      "sha256": "48edb84cb7b66da26fe436bac23f2fae91310328313afa2529eac756309c50cf"
+    },
+    {
+      "path": "assets/Cell-DWN5Ai8V.js",
+      "bytes": 219,
+      "sha256": "ca4cd673d8809dcb476980836aa7648297196bede7d05e977a8f0bacf26cf00c"
+    },
+    {
+      "path": "assets/CreateOrder-TGfi45nl.js",
+      "bytes": 1887,
+      "sha256": "81a052f3a503d896581bd47b4caaf36d87931fb75e661f3fa5c0a1bedbee59a8"
+    },
+    {
+      "path": "assets/DetailTabs-spKgnltR.js",
+      "bytes": 2146,
+      "sha256": "d7147e10d89e77e29978b8527d96086954ca19e85cdafe84996d37cbcf896c85"
+    },
+    {
+      "path": "assets/format-nHo6RYTp.js",
+      "bytes": 123,
+      "sha256": "981ca6d57d7e36222a424072752ca13609aa6affe6b70125a1ff7a2e5861e619"
+    },
+    {
+      "path": "assets/index-CFkKo00Z.css",
+      "bytes": 8067,
+      "sha256": "becff34e2d915a2f9469cf50ea93e0b58f733abdfca63bac457e84079baf6de4"
+    },
+    {
+      "path": "assets/index-DxuZP1EQ.js",
+      "bytes": 56951,
+      "sha256": "7d313b43d68cd5e28a43bd192d3a89162d90f299f2f97d2983b3c04641f2c889"
+    },
+    {
+      "path": "assets/Modal-CjDV0P6N.js",
+      "bytes": 814,
+      "sha256": "771ab13ee5545389481ba711cd05cdee9ac8971b80c01d6ee66633ba30b128b0"
+    },
+    {
+      "path": "assets/OrderDetail-Dgqas4pD.js",
+      "bytes": 592,
+      "sha256": "9be481050ddd5a35ff3cc69aabedb34271a999bef819694a93f0cdc314396225"
+    },
+    {
+      "path": "assets/OrdersPage-BOYsmDGu.js",
+      "bytes": 5292,
+      "sha256": "cbd6dcf021ddfde25f9f01a2a3f66c7ac55e761530c6a0a9218ae007bc11778f"
+    },
+    {
+      "path": "assets/OrdersPage-x42yBuw9.css",
+      "bytes": 322,
+      "sha256": "65f6db5a24063571d9a9db215ed7870fb8f470cea69a4a12387f7dcd657b8c95"
+    },
+    {
+      "path": "assets/Panel-D-w6wZQg.js",
+      "bytes": 568,
+      "sha256": "1b04d9fa7445b09bc14e4c8e2796b3752d23fe23e01a931e359f52755595e26e"
+    },
+    {
+      "path": "assets/Panel-DUA2MwWk.js",
+      "bytes": 666,
+      "sha256": "e48bb56d23fea46fc01725d8d8bc86840de8a4ea0ee6cb715d629dc16c34d343"
+    },
+    {
+      "path": "assets/runtime-core.esm-bundler-CSwxqbRw.js",
+      "bytes": 60221,
+      "sha256": "a4c321635001b13484c68865674e61d4749f227a4eb169f3026688cad5a72998"
+    },
+    {
+      "path": "assets/useAction-D1sgTQBc.js",
+      "bytes": 4396,
+      "sha256": "a0048a5aff8f6b98785dbf4340b126b70ce9b5de91c82d4c8cda99ce66282d22"
+    },
+    {
+      "path": "assets/useColumns-CjlseyRc.js",
+      "bytes": 227,
+      "sha256": "23ebe1e24c3fbdc00a3087e11bee0319c924656b6ec2f7a8ffa0699d4b023c13"
+    },
+    {
+      "path": "index.html",
+      "bytes": 497,
+      "sha256": "66ccdb7faf21f408833385490f016b7ace9444ecc16449c495ca31f1a8355620"
+    }
+  ],
+  "customFileCount": 24,
+  "referenceFileCount": 120,
+  "customBytes": 153053,
+  "referenceBytes": 417415,
+  "customArchiveBytes": 59552,
+  "referenceArchiveBytes": 131840,
+  "packageHash": "6c2c78af351c3b2c165b1eb6ea057f616b5b45869fa9d45e879a2209f78eb356",
+  "referencePackageHash": "58cd0d5f49d1edb6de8f914be167e7d766842cc34346ecf0eddc7e0397712d8b",
+  "archive": ".artifacts/enterprise-granular-proof/granular-proof-20261026-01.tar.gz",
+  "referenceArchive": ".artifacts/enterprise-a/granular-proof-20261026-01-full.tar.gz",
+  "browser": {
+    "checks": [
+      "Only orders/approvals menus and selected order columns/actions are rendered.",
+      "Order creation works with two required fields and only the overview tab.",
+      "Approval submission/initial approval work, urgency remains, cost center and opinion fields are absent, and only two selected detail tabs exist.",
+      "Removing review capability does not bypass the large-amount review state.",
+      "Excluded module deep links show not-found; all requested assets belong to the sealed file allowlist; no browser runtime errors."
+    ],
+    "resourceRequests": [
+      "assets/Action-TleImahc.js",
+      "assets/ApprovalDetail-CUQzLr1X.js",
+      "assets/ApprovalHistory-CDBXXO4e.js",
+      "assets/ApprovalSubmit-DfiS2ttH.js",
+      "assets/ApprovalsPage-CmMc2Lzc.js",
+      "assets/Cell-6pql7t0s.js",
+      "assets/Cell-BfTrVDyW.js",
+      "assets/Cell-DTjCei8r.js",
+      "assets/Cell-DWN5Ai8V.js",
+      "assets/CreateOrder-TGfi45nl.js",
+      "assets/DetailTabs-spKgnltR.js",
+      "assets/Modal-CjDV0P6N.js",
+      "assets/OrderDetail-Dgqas4pD.js",
+      "assets/OrdersPage-BOYsmDGu.js",
+      "assets/OrdersPage-x42yBuw9.css",
+      "assets/Panel-D-w6wZQg.js",
+      "assets/Panel-DUA2MwWk.js",
+      "assets/format-nHo6RYTp.js",
+      "assets/index-CFkKo00Z.css",
+      "assets/index-DxuZP1EQ.js",
+      "assets/runtime-core.esm-bundler-CSwxqbRw.js",
+      "assets/useAction-D1sgTQBc.js",
+      "assets/useColumns-CjlseyRc.js"
+    ],
+    "errors": []
+  }
+}
