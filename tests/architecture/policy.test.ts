@@ -94,7 +94,7 @@ describe('enterprise policy', () => {
   it('keeps B registry and source closure free of disabled business and other brands', () => {
     const root = setup();
     const policy = loadPolicy(root, 'enterprise-b');
-    expect(registrySource(policy)).toContain('/orders/index.ts');
+    expect(registrySource(policy)).toContain('/orders/base/index.ts');
     expect(registrySource(policy)).not.toMatch(
       /reports|order-export|inventory|approval|audit-log|order-notes/u,
     );
@@ -134,17 +134,21 @@ describe('source boundary reverse cases', () => {
       `import registry from 'virtual:enterprise-modules'; void registry;`,
       'REGISTRY_OUTSIDE_COMPOSITION',
     ],
-    ['reverse composition', `import '../../composition/assemble';`, 'REVERSE_COMPOSITION_IMPORT'],
-    ['re-export', `export * from '../reports/api';`, 'FORBIDDEN_MODULE'],
-    ['dead dynamic import', `if (false) void import('../reports/api');`, 'FORBIDDEN_MODULE'],
+    [
+      'reverse composition',
+      `import '../../../composition/assemble';`,
+      'REVERSE_COMPOSITION_IMPORT',
+    ],
+    ['re-export', `export * from '../../reports/api';`, 'FORBIDDEN_MODULE'],
+    ['dead dynamic import', `if (false) void import('../../reports/api');`, 'FORBIDDEN_MODULE'],
     [
       'glob and filter',
       `const all = import.meta.glob('../*/index.ts'); void all;`,
       'FORBIDDEN_LOADER',
     ],
     ['computed import', `const path = './api'; void import(path);`, 'COMPUTED_IMPORT'],
-    ['raw asset', `import text from '../reports/api.ts?raw'; void text;`, 'FORBIDDEN_MODULE'],
-    ['wrong brand', `import '../../branding/brand-a/theme.css';`, 'FORBIDDEN_BRAND'],
+    ['raw asset', `import text from '../../reports/api.ts?raw'; void text;`, 'FORBIDDEN_MODULE'],
+    ['wrong brand', `import '../../../branding/brand-a/theme.css';`, 'FORBIDDEN_BRAND'],
     ['external script', `void import('https://example.invalid/report.js');`, 'EXTERNAL_SOURCE'],
     ['eval', `globalThis.eval('console.log(1)');`, 'FORBIDDEN_LOADER'],
     ['function generator', `new Function('return 1');`, 'FORBIDDEN_LOADER'],
@@ -152,14 +156,21 @@ describe('source boundary reverse cases', () => {
     ['remote worker', `new Worker('https://example.invalid/a.js');`, 'UNTRACEABLE_WORKER'],
   ])('rejects %s before tree shaking', (_label, code, error) => {
     const root = setup();
-    append(root, 'src/modules/orders/api.ts', code);
+    append(root, 'src/modules/orders/base/api.ts', code);
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow(error);
   });
 
   it('rejects indirect barrel imports, shared reverse imports and private imports even in full A', () => {
     const root = setup();
     writeFileSync(resolve(root, 'src/shared/barrel.ts'), `export * from '../modules/reports/api';`);
-    append(root, 'src/modules/orders/api.ts', `import '../../shared/barrel';`);
+    append(root, 'src/modules/orders/base/api.ts', `import '../../../shared/barrel';`);
+    expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
+    expect(() => scanSources(loadPolicy(root, 'enterprise-a'))).toThrow('PRIVATE_MODULE_IMPORT');
+  });
+
+  it('keeps sibling capabilities isolated within the same business folder', () => {
+    const root = setup();
+    append(root, 'src/modules/orders/base/api.ts', `export * from '../order-export/csv';`);
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
     expect(() => scanSources(loadPolicy(root, 'enterprise-a'))).toThrow('PRIVATE_MODULE_IMPORT');
   });
@@ -167,7 +178,7 @@ describe('source boundary reverse cases', () => {
   it('rejects a symlinked disabled implementation', () => {
     const root = setup();
     symlinkSync(resolve(root, 'src/modules/reports/api.ts'), resolve(root, 'src/shared/sneaky.ts'));
-    append(root, 'src/modules/orders/api.ts', `import '../../shared/sneaky';`);
+    append(root, 'src/modules/orders/base/api.ts', `import '../../../shared/sneaky';`);
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
   });
 
@@ -175,18 +186,18 @@ describe('source boundary reverse cases', () => {
     const root = setup();
     append(
       root,
-      'src/modules/orders/orders.css',
-      `.x { background: url('../reports/assets/revenue.svg'); }`,
+      'src/modules/orders/base/orders.css',
+      `.x { background: url('../../reports/assets/revenue.svg'); }`,
     );
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
     writeFileSync(
-      resolve(root, 'src/modules/orders/orders.css'),
-      '@import "../reports/reports.css";',
+      resolve(root, 'src/modules/orders/base/orders.css'),
+      '@import "../../reports/reports.css";',
     );
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
     writeFileSync(
-      resolve(root, 'src/modules/orders/orders.css'),
-      '.x { background: url("../rep\\6frts/assets/revenue.svg"); }',
+      resolve(root, 'src/modules/orders/base/orders.css'),
+      '.x { background: url("../../rep\\6frts/assets/revenue.svg"); }',
     );
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
   });
@@ -198,8 +209,8 @@ describe('source boundary reverse cases', () => {
     });
     append(
       root,
-      'src/modules/order-export/export.worker.ts',
-      `if (false) void import('../reports/api');`,
+      'src/modules/orders/order-export/export.worker.ts',
+      `if (false) void import('../../reports/api');`,
     );
     expect(() => scanSources(loadPolicy(root, 'enterprise-a'))).toThrow('FORBIDDEN_MODULE');
   });
@@ -207,7 +218,7 @@ describe('source boundary reverse cases', () => {
   it('treats owned workspace packages as business, not approved generic vendors', () => {
     const root = setup();
     symlinkSync(resolve(root, 'src/modules/reports'), resolve(root, 'src/shared/package-alias'));
-    append(root, 'src/modules/orders/api.ts', `import '../../shared/package-alias/api';`);
+    append(root, 'src/modules/orders/base/api.ts', `import '../../../shared/package-alias/api';`);
     expect(() => scanSources(loadPolicy(root, 'enterprise-b'))).toThrow('FORBIDDEN_MODULE');
   });
 });

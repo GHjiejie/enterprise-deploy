@@ -5,7 +5,7 @@ import { ref } from 'vue';
 import type { FeatureModule, FeatureRoute } from '../../src/contracts/feature';
 import { activateModules, assembleModules } from '../../src/composition/assemble';
 import { permitted } from '../../src/core/runtime';
-import { toCsv } from '../../src/modules/order-export/csv';
+import { toCsv } from '../../src/modules/orders/order-export/csv';
 
 const moduleContext: ModuleContext = {
   activity: createActivityBus(() => 'test'),

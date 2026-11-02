@@ -3,10 +3,10 @@
   "modules": [
     {
       "id": "orders",
-      "entry": "src/modules/orders/index.ts",
+      "entry": "src/modules/orders/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/orders"]
+      "ownedRoots": ["src/modules/orders/base"]
     },
     {
       "id": "reports",
@@ -17,63 +17,63 @@
     },
     {
       "id": "order-export",
-      "entry": "src/modules/order-export/index.ts",
+      "entry": "src/modules/orders/order-export/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-export"]
+      "ownedRoots": ["src/modules/orders/order-export"]
     },
     {
       "id": "order-create",
-      "entry": "src/modules/order-create/index.ts",
+      "entry": "src/modules/orders/order-create/index.ts",
       "requires": ["orders", "order-field-customer", "order-field-amount"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-create"]
+      "ownedRoots": ["src/modules/orders/order-create"]
     },
     {
       "id": "order-bulk-complete",
-      "entry": "src/modules/order-bulk-complete/index.ts",
+      "entry": "src/modules/orders/order-bulk-complete/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-bulk-complete"]
+      "ownedRoots": ["src/modules/orders/order-bulk-complete"]
     },
     {
       "id": "order-priority",
-      "entry": "src/modules/order-priority/index.ts",
+      "entry": "src/modules/orders/order-priority/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-priority"]
+      "ownedRoots": ["src/modules/orders/order-priority"]
     },
     {
       "id": "order-detail",
-      "entry": "src/modules/order-detail/index.ts",
+      "entry": "src/modules/orders/order-detail/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-detail"]
+      "ownedRoots": ["src/modules/orders/order-detail"]
     },
     {
       "id": "order-notes",
-      "entry": "src/modules/order-notes/index.ts",
+      "entry": "src/modules/orders/order-notes/index.ts",
       "requires": ["order-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-notes"]
+      "ownedRoots": ["src/modules/orders/order-notes"]
     },
     {
       "id": "inventory",
-      "entry": "src/modules/inventory/index.ts",
+      "entry": "src/modules/inventory/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory"]
+      "ownedRoots": ["src/modules/inventory/base"]
     },
     {
       "id": "inventory-adjust",
-      "entry": "src/modules/inventory-adjust/index.ts",
+      "entry": "src/modules/inventory/inventory-adjust/index.ts",
       "requires": ["inventory", "inventory-adjust-field-quantity", "inventory-adjust-field-reason"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-adjust"]
+      "ownedRoots": ["src/modules/inventory/inventory-adjust"]
     },
     {
       "id": "inventory-transfer",
-      "entry": "src/modules/inventory-transfer/index.ts",
+      "entry": "src/modules/inventory/inventory-transfer/index.ts",
       "requires": [
         "inventory",
         "inventory-transfer-field-source",
@@ -82,18 +82,18 @@
         "inventory-transfer-field-reason"
       ],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-transfer"]
+      "ownedRoots": ["src/modules/inventory/inventory-transfer"]
     },
     {
       "id": "approvals",
-      "entry": "src/modules/approvals/index.ts",
+      "entry": "src/modules/approvals/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approvals"]
+      "ownedRoots": ["src/modules/approvals/base"]
     },
     {
       "id": "approval-submit",
-      "entry": "src/modules/approval-submit/index.ts",
+      "entry": "src/modules/approvals/approval-submit/index.ts",
       "requires": [
         "approvals",
         "approval-field-title",
@@ -101,14 +101,14 @@
         "approval-field-amount"
       ],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-submit"]
+      "ownedRoots": ["src/modules/approvals/approval-submit"]
     },
     {
       "id": "approval-history",
-      "entry": "src/modules/approval-history/index.ts",
+      "entry": "src/modules/approvals/approval-history/index.ts",
       "requires": ["approval-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-history"]
+      "ownedRoots": ["src/modules/approvals/approval-history"]
     },
     {
       "id": "audit-log",
@@ -119,431 +119,431 @@
     },
     {
       "id": "approval-approve",
-      "entry": "src/modules/approval-approve/index.ts",
+      "entry": "src/modules/approvals/approval-approve/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-approve"]
+      "ownedRoots": ["src/modules/approvals/approval-approve"]
     },
     {
       "id": "approval-reject",
-      "entry": "src/modules/approval-reject/index.ts",
+      "entry": "src/modules/approvals/approval-reject/index.ts",
       "requires": ["approvals", "approval-reject-field-reason"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-reject"]
+      "ownedRoots": ["src/modules/approvals/approval-reject"]
     },
     {
       "id": "approval-review",
-      "entry": "src/modules/approval-review/index.ts",
+      "entry": "src/modules/approvals/approval-review/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-review"]
+      "ownedRoots": ["src/modules/approvals/approval-review"]
     },
     {
       "id": "order-field-customer",
-      "entry": "src/modules/order-field-customer/index.ts",
+      "entry": "src/modules/orders/order-field-customer/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-field-customer"]
+      "ownedRoots": ["src/modules/orders/order-field-customer"]
     },
     {
       "id": "order-field-amount",
-      "entry": "src/modules/order-field-amount/index.ts",
+      "entry": "src/modules/orders/order-field-amount/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-field-amount"]
+      "ownedRoots": ["src/modules/orders/order-field-amount"]
     },
     {
       "id": "order-field-reference",
-      "entry": "src/modules/order-field-reference/index.ts",
+      "entry": "src/modules/orders/order-field-reference/index.ts",
       "requires": ["order-create"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-field-reference"]
+      "ownedRoots": ["src/modules/orders/order-field-reference"]
     },
     {
       "id": "approval-field-title",
-      "entry": "src/modules/approval-field-title/index.ts",
+      "entry": "src/modules/approvals/approval-field-title/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-field-title"]
+      "ownedRoots": ["src/modules/approvals/approval-field-title"]
     },
     {
       "id": "approval-field-applicant",
-      "entry": "src/modules/approval-field-applicant/index.ts",
+      "entry": "src/modules/approvals/approval-field-applicant/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-field-applicant"]
+      "ownedRoots": ["src/modules/approvals/approval-field-applicant"]
     },
     {
       "id": "approval-field-amount",
-      "entry": "src/modules/approval-field-amount/index.ts",
+      "entry": "src/modules/approvals/approval-field-amount/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-field-amount"]
+      "ownedRoots": ["src/modules/approvals/approval-field-amount"]
     },
     {
       "id": "approval-field-cost-center",
-      "entry": "src/modules/approval-field-cost-center/index.ts",
+      "entry": "src/modules/approvals/approval-field-cost-center/index.ts",
       "requires": ["approval-submit"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-field-cost-center"]
+      "ownedRoots": ["src/modules/approvals/approval-field-cost-center"]
     },
     {
       "id": "approval-field-urgency",
-      "entry": "src/modules/approval-field-urgency/index.ts",
+      "entry": "src/modules/approvals/approval-field-urgency/index.ts",
       "requires": ["approval-submit"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-field-urgency"]
+      "ownedRoots": ["src/modules/approvals/approval-field-urgency"]
     },
     {
       "id": "order-column-customer",
-      "entry": "src/modules/order-column-customer/index.ts",
+      "entry": "src/modules/orders/order-column-customer/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-column-customer"]
+      "ownedRoots": ["src/modules/orders/order-column-customer"]
     },
     {
       "id": "order-column-amount",
-      "entry": "src/modules/order-column-amount/index.ts",
+      "entry": "src/modules/orders/order-column-amount/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-column-amount"]
+      "ownedRoots": ["src/modules/orders/order-column-amount"]
     },
     {
       "id": "order-column-status",
-      "entry": "src/modules/order-column-status/index.ts",
+      "entry": "src/modules/orders/order-column-status/index.ts",
       "requires": ["orders"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-column-status"]
+      "ownedRoots": ["src/modules/orders/order-column-status"]
     },
     {
       "id": "approval-column-title",
-      "entry": "src/modules/approval-column-title/index.ts",
+      "entry": "src/modules/approvals/approval-column-title/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-column-title"]
+      "ownedRoots": ["src/modules/approvals/approval-column-title"]
     },
     {
       "id": "approval-column-applicant",
-      "entry": "src/modules/approval-column-applicant/index.ts",
+      "entry": "src/modules/approvals/approval-column-applicant/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-column-applicant"]
+      "ownedRoots": ["src/modules/approvals/approval-column-applicant"]
     },
     {
       "id": "approval-column-amount",
-      "entry": "src/modules/approval-column-amount/index.ts",
+      "entry": "src/modules/approvals/approval-column-amount/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-column-amount"]
+      "ownedRoots": ["src/modules/approvals/approval-column-amount"]
     },
     {
       "id": "approval-column-status",
-      "entry": "src/modules/approval-column-status/index.ts",
+      "entry": "src/modules/approvals/approval-column-status/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-column-status"]
+      "ownedRoots": ["src/modules/approvals/approval-column-status"]
     },
     {
       "id": "inventory-column-quantity",
-      "entry": "src/modules/inventory-column-quantity/index.ts",
+      "entry": "src/modules/inventory/inventory-column-quantity/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-column-quantity"]
+      "ownedRoots": ["src/modules/inventory/inventory-column-quantity"]
     },
     {
       "id": "inventory-column-reserved",
-      "entry": "src/modules/inventory-column-reserved/index.ts",
+      "entry": "src/modules/inventory/inventory-column-reserved/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-column-reserved"]
+      "ownedRoots": ["src/modules/inventory/inventory-column-reserved"]
     },
     {
       "id": "inventory-column-available",
-      "entry": "src/modules/inventory-column-available/index.ts",
+      "entry": "src/modules/inventory/inventory-column-available/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-column-available"]
+      "ownedRoots": ["src/modules/inventory/inventory-column-available"]
     },
     {
       "id": "inventory-column-status",
-      "entry": "src/modules/inventory-column-status/index.ts",
+      "entry": "src/modules/inventory/inventory-column-status/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-column-status"]
+      "ownedRoots": ["src/modules/inventory/inventory-column-status"]
     },
     {
       "id": "approval-detail",
-      "entry": "src/modules/approval-detail/index.ts",
+      "entry": "src/modules/approvals/approval-detail/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-detail"]
+      "ownedRoots": ["src/modules/approvals/approval-detail"]
     },
     {
       "id": "order-detail-overview",
-      "entry": "src/modules/order-detail-overview/index.ts",
+      "entry": "src/modules/orders/order-detail-overview/index.ts",
       "requires": ["order-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-detail-overview"]
+      "ownedRoots": ["src/modules/orders/order-detail-overview"]
     },
     {
       "id": "approval-detail-overview",
-      "entry": "src/modules/approval-detail-overview/index.ts",
+      "entry": "src/modules/approvals/approval-detail-overview/index.ts",
       "requires": ["approval-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-detail-overview"]
+      "ownedRoots": ["src/modules/approvals/approval-detail-overview"]
     },
     {
       "id": "order-detail-extra",
-      "entry": "src/modules/order-detail-extra/index.ts",
+      "entry": "src/modules/orders/order-detail-extra/index.ts",
       "requires": ["order-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/order-detail-extra"]
+      "ownedRoots": ["src/modules/orders/order-detail-extra"]
     },
     {
       "id": "approval-detail-extra",
-      "entry": "src/modules/approval-detail-extra/index.ts",
+      "entry": "src/modules/approvals/approval-detail-extra/index.ts",
       "requires": ["approval-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-detail-extra"]
+      "ownedRoots": ["src/modules/approvals/approval-detail-extra"]
     },
     {
       "id": "inventory-adjust-field-quantity",
-      "entry": "src/modules/inventory-adjust-field-quantity/index.ts",
+      "entry": "src/modules/inventory/inventory-adjust-field-quantity/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-adjust-field-quantity"]
+      "ownedRoots": ["src/modules/inventory/inventory-adjust-field-quantity"]
     },
     {
       "id": "inventory-adjust-field-reason",
-      "entry": "src/modules/inventory-adjust-field-reason/index.ts",
+      "entry": "src/modules/inventory/inventory-adjust-field-reason/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-adjust-field-reason"]
+      "ownedRoots": ["src/modules/inventory/inventory-adjust-field-reason"]
     },
     {
       "id": "inventory-transfer-field-source",
-      "entry": "src/modules/inventory-transfer-field-source/index.ts",
+      "entry": "src/modules/inventory/inventory-transfer-field-source/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-transfer-field-source"]
+      "ownedRoots": ["src/modules/inventory/inventory-transfer-field-source"]
     },
     {
       "id": "inventory-transfer-field-target",
-      "entry": "src/modules/inventory-transfer-field-target/index.ts",
+      "entry": "src/modules/inventory/inventory-transfer-field-target/index.ts",
       "requires": ["inventory", "inventory-transfer-field-source"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-transfer-field-target"]
+      "ownedRoots": ["src/modules/inventory/inventory-transfer-field-target"]
     },
     {
       "id": "inventory-transfer-field-quantity",
-      "entry": "src/modules/inventory-transfer-field-quantity/index.ts",
+      "entry": "src/modules/inventory/inventory-transfer-field-quantity/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-transfer-field-quantity"]
+      "ownedRoots": ["src/modules/inventory/inventory-transfer-field-quantity"]
     },
     {
       "id": "inventory-transfer-field-reason",
-      "entry": "src/modules/inventory-transfer-field-reason/index.ts",
+      "entry": "src/modules/inventory/inventory-transfer-field-reason/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/inventory-transfer-field-reason"]
+      "ownedRoots": ["src/modules/inventory/inventory-transfer-field-reason"]
     },
     {
       "id": "approval-approve-field-comment",
-      "entry": "src/modules/approval-approve-field-comment/index.ts",
+      "entry": "src/modules/approvals/approval-approve-field-comment/index.ts",
       "requires": ["approval-approve"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-approve-field-comment"]
+      "ownedRoots": ["src/modules/approvals/approval-approve-field-comment"]
     },
     {
       "id": "approval-reject-field-reason",
-      "entry": "src/modules/approval-reject-field-reason/index.ts",
+      "entry": "src/modules/approvals/approval-reject-field-reason/index.ts",
       "requires": ["approvals"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-reject-field-reason"]
+      "ownedRoots": ["src/modules/approvals/approval-reject-field-reason"]
     },
     {
       "id": "approval-review-field-comment",
-      "entry": "src/modules/approval-review-field-comment/index.ts",
+      "entry": "src/modules/approvals/approval-review-field-comment/index.ts",
       "requires": ["approval-review"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/approval-review-field-comment"]
+      "ownedRoots": ["src/modules/approvals/approval-review-field-comment"]
     },
     {
       "id": "stocktakes",
-      "entry": "src/modules/stocktakes/index.ts",
+      "entry": "src/modules/stocktakes/base/index.ts",
       "requires": ["inventory"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktakes"]
+      "ownedRoots": ["src/modules/stocktakes/base"]
     },
     {
       "id": "stocktake-create-field-title",
-      "entry": "src/modules/stocktake-create-field-title/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-create-field-title/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-create-field-title"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-create-field-title"]
     },
     {
       "id": "stocktake-create-field-warehouse",
-      "entry": "src/modules/stocktake-create-field-warehouse/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-create-field-warehouse/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-create-field-warehouse"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-create-field-warehouse"]
     },
     {
       "id": "stocktake-create-field-note",
-      "entry": "src/modules/stocktake-create-field-note/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-create-field-note/index.ts",
       "requires": ["stocktake-create"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-create-field-note"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-create-field-note"]
     },
     {
       "id": "stocktake-count-field-quantity",
-      "entry": "src/modules/stocktake-count-field-quantity/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-count-field-quantity/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-count-field-quantity"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-count-field-quantity"]
     },
     {
       "id": "stocktake-count-field-reason",
-      "entry": "src/modules/stocktake-count-field-reason/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-count-field-reason/index.ts",
       "requires": ["stocktakes", "stocktake-count-field-quantity"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-count-field-reason"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-count-field-reason"]
     },
     {
       "id": "stocktake-return-field-reason",
-      "entry": "src/modules/stocktake-return-field-reason/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-return-field-reason/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-return-field-reason"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-return-field-reason"]
     },
     {
       "id": "stocktake-cancel-field-reason",
-      "entry": "src/modules/stocktake-cancel-field-reason/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-cancel-field-reason/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-cancel-field-reason"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-cancel-field-reason"]
     },
     {
       "id": "stocktake-approve-field-comment",
-      "entry": "src/modules/stocktake-approve-field-comment/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-approve-field-comment/index.ts",
       "requires": ["stocktake-approve"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-approve-field-comment"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-approve-field-comment"]
     },
     {
       "id": "stocktake-create",
-      "entry": "src/modules/stocktake-create/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-create/index.ts",
       "requires": [
         "stocktakes",
         "stocktake-create-field-title",
         "stocktake-create-field-warehouse"
       ],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-create"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-create"]
     },
     {
       "id": "stocktake-count",
-      "entry": "src/modules/stocktake-count/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-count/index.ts",
       "requires": [
         "stocktake-detail-lines",
         "stocktake-count-field-quantity",
         "stocktake-count-field-reason"
       ],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-count"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-count"]
     },
     {
       "id": "stocktake-submit",
-      "entry": "src/modules/stocktake-submit/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-submit/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-submit"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-submit"]
     },
     {
       "id": "stocktake-approve",
-      "entry": "src/modules/stocktake-approve/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-approve/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-approve"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-approve"]
     },
     {
       "id": "stocktake-return",
-      "entry": "src/modules/stocktake-return/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-return/index.ts",
       "requires": ["stocktakes", "stocktake-return-field-reason"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-return"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-return"]
     },
     {
       "id": "stocktake-post",
-      "entry": "src/modules/stocktake-post/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-post/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-post"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-post"]
     },
     {
       "id": "stocktake-cancel",
-      "entry": "src/modules/stocktake-cancel/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-cancel/index.ts",
       "requires": ["stocktakes", "stocktake-cancel-field-reason"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-cancel"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-cancel"]
     },
     {
       "id": "stocktake-detail",
-      "entry": "src/modules/stocktake-detail/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-detail/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-detail"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-detail"]
     },
     {
       "id": "stocktake-column-warehouse",
-      "entry": "src/modules/stocktake-column-warehouse/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-column-warehouse/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-column-warehouse"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-column-warehouse"]
     },
     {
       "id": "stocktake-column-progress",
-      "entry": "src/modules/stocktake-column-progress/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-column-progress/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-column-progress"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-column-progress"]
     },
     {
       "id": "stocktake-column-difference",
-      "entry": "src/modules/stocktake-column-difference/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-column-difference/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-column-difference"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-column-difference"]
     },
     {
       "id": "stocktake-column-status",
-      "entry": "src/modules/stocktake-column-status/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-column-status/index.ts",
       "requires": ["stocktakes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-column-status"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-column-status"]
     },
     {
       "id": "stocktake-detail-lines",
-      "entry": "src/modules/stocktake-detail-lines/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-detail-lines/index.ts",
       "requires": ["stocktake-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-detail-lines"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-detail-lines"]
     },
     {
       "id": "stocktake-detail-history",
-      "entry": "src/modules/stocktake-detail-history/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-detail-history/index.ts",
       "requires": ["stocktake-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-detail-history"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-detail-history"]
     },
     {
       "id": "stocktake-detail-extra",
-      "entry": "src/modules/stocktake-detail-extra/index.ts",
+      "entry": "src/modules/stocktakes/stocktake-detail-extra/index.ts",
       "requires": ["stocktake-detail"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/stocktake-detail-extra"]
+      "ownedRoots": ["src/modules/stocktakes/stocktake-detail-extra"]
     },
     {
       "id": "onboarding",
@@ -554,304 +554,304 @@
     },
     {
       "id": "resource-sms",
-      "entry": "src/modules/resource-sms/index.ts",
+      "entry": "src/modules/resources/resource-sms/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-sms"]
+      "ownedRoots": ["src/modules/resources/resource-sms"]
     },
     {
       "id": "resource-captcha",
-      "entry": "src/modules/resource-captcha/index.ts",
+      "entry": "src/modules/resources/resource-captcha/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-captcha"]
+      "ownedRoots": ["src/modules/resources/resource-captcha"]
     },
     {
       "id": "resource-cloudauth",
-      "entry": "src/modules/resource-cloudauth/index.ts",
+      "entry": "src/modules/resources/resource-cloudauth/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-cloudauth"]
+      "ownedRoots": ["src/modules/resources/resource-cloudauth"]
     },
     {
       "id": "resource-wechat",
-      "entry": "src/modules/resource-wechat/index.ts",
+      "entry": "src/modules/resources/resource-wechat/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-wechat"]
+      "ownedRoots": ["src/modules/resources/resource-wechat"]
     },
     {
       "id": "resource-pay",
-      "entry": "src/modules/resource-pay/index.ts",
+      "entry": "src/modules/resources/resource-pay/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-pay"]
+      "ownedRoots": ["src/modules/resources/resource-pay"]
     },
     {
       "id": "resource-wecom",
-      "entry": "src/modules/resource-wecom/index.ts",
+      "entry": "src/modules/resources/resource-wecom/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-wecom"]
+      "ownedRoots": ["src/modules/resources/resource-wecom"]
     },
     {
       "id": "resource-smtp",
-      "entry": "src/modules/resource-smtp/index.ts",
+      "entry": "src/modules/resources/resource-smtp/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-smtp"]
+      "ownedRoots": ["src/modules/resources/resource-smtp"]
     },
     {
       "id": "resource-oss",
-      "entry": "src/modules/resource-oss/index.ts",
+      "entry": "src/modules/resources/resource-oss/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-oss"]
+      "ownedRoots": ["src/modules/resources/resource-oss"]
     },
     {
       "id": "resource-feishu",
-      "entry": "src/modules/resource-feishu/index.ts",
+      "entry": "src/modules/resources/resource-feishu/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-feishu"]
+      "ownedRoots": ["src/modules/resources/resource-feishu"]
     },
     {
       "id": "resource-hermes",
-      "entry": "src/modules/resource-hermes/index.ts",
+      "entry": "src/modules/resources/resource-hermes/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/resource-hermes"]
+      "ownedRoots": ["src/modules/resources/resource-hermes"]
     },
     {
       "id": "access",
-      "entry": "src/modules/access/index.ts",
+      "entry": "src/modules/access/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/access"]
+      "ownedRoots": ["src/modules/access/base"]
     },
     {
       "id": "account",
-      "entry": "src/modules/account/index.ts",
+      "entry": "src/modules/account/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account"]
+      "ownedRoots": ["src/modules/account/base"]
     },
     {
       "id": "billing",
-      "entry": "src/modules/billing/index.ts",
+      "entry": "src/modules/billing/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/billing"]
+      "ownedRoots": ["src/modules/billing/base"]
     },
     {
       "id": "media",
-      "entry": "src/modules/media/index.ts",
+      "entry": "src/modules/media/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/media"]
+      "ownedRoots": ["src/modules/media/base"]
     },
     {
       "id": "operations",
-      "entry": "src/modules/operations/index.ts",
+      "entry": "src/modules/operations/base/index.ts",
       "requires": [],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations"]
+      "ownedRoots": ["src/modules/operations/base"]
     },
     {
       "id": "access-sms-login",
-      "entry": "src/modules/access-sms-login/index.ts",
+      "entry": "src/modules/access/access-sms-login/index.ts",
       "requires": ["access", "resource-sms"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/access-sms-login"]
+      "ownedRoots": ["src/modules/access/access-sms-login"]
     },
     {
       "id": "access-sms-register",
-      "entry": "src/modules/access-sms-register/index.ts",
+      "entry": "src/modules/access/access-sms-register/index.ts",
       "requires": ["access", "resource-sms"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/access-sms-register"]
+      "ownedRoots": ["src/modules/access/access-sms-register"]
     },
     {
       "id": "access-sms-recover",
-      "entry": "src/modules/access-sms-recover/index.ts",
+      "entry": "src/modules/access/access-sms-recover/index.ts",
       "requires": ["access", "resource-sms"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/access-sms-recover"]
+      "ownedRoots": ["src/modules/access/access-sms-recover"]
     },
     {
       "id": "account-sms-mobile",
-      "entry": "src/modules/account-sms-mobile/index.ts",
+      "entry": "src/modules/account/account-sms-mobile/index.ts",
       "requires": ["account", "resource-sms"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-sms-mobile"]
+      "ownedRoots": ["src/modules/account/account-sms-mobile"]
     },
     {
       "id": "account-sms-close",
-      "entry": "src/modules/account-sms-close/index.ts",
+      "entry": "src/modules/account/account-sms-close/index.ts",
       "requires": ["account", "resource-sms"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-sms-close"]
+      "ownedRoots": ["src/modules/account/account-sms-close"]
     },
     {
       "id": "access-captcha",
-      "entry": "src/modules/access-captcha/index.ts",
+      "entry": "src/modules/access/access-captcha/index.ts",
       "requires": ["access", "resource-captcha"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/access-captcha"]
+      "ownedRoots": ["src/modules/access/access-captcha"]
     },
     {
       "id": "account-personal-auth",
-      "entry": "src/modules/account-personal-auth/index.ts",
+      "entry": "src/modules/account/account-personal-auth/index.ts",
       "requires": ["account", "resource-cloudauth"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-personal-auth"]
+      "ownedRoots": ["src/modules/account/account-personal-auth"]
     },
     {
       "id": "account-enterprise-auth",
-      "entry": "src/modules/account-enterprise-auth/index.ts",
+      "entry": "src/modules/account/account-enterprise-auth/index.ts",
       "requires": ["account", "resource-cloudauth"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-enterprise-auth"]
+      "ownedRoots": ["src/modules/account/account-enterprise-auth"]
     },
     {
       "id": "access-wechat-login",
-      "entry": "src/modules/access-wechat-login/index.ts",
+      "entry": "src/modules/access/access-wechat-login/index.ts",
       "requires": ["access", "resource-wechat"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/access-wechat-login"]
+      "ownedRoots": ["src/modules/access/access-wechat-login"]
     },
     {
       "id": "account-wechat-bind",
-      "entry": "src/modules/account-wechat-bind/index.ts",
+      "entry": "src/modules/account/account-wechat-bind/index.ts",
       "requires": ["account", "resource-wechat"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-wechat-bind"]
+      "ownedRoots": ["src/modules/account/account-wechat-bind"]
     },
     {
       "id": "billing-recharge",
-      "entry": "src/modules/billing-recharge/index.ts",
+      "entry": "src/modules/billing/billing-recharge/index.ts",
       "requires": ["billing", "resource-pay"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/billing-recharge"]
+      "ownedRoots": ["src/modules/billing/billing-recharge"]
     },
     {
       "id": "billing-refund",
-      "entry": "src/modules/billing-refund/index.ts",
+      "entry": "src/modules/billing/billing-refund/index.ts",
       "requires": ["billing", "resource-pay"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/billing-refund"]
+      "ownedRoots": ["src/modules/billing/billing-refund"]
     },
     {
       "id": "billing-statement",
-      "entry": "src/modules/billing-statement/index.ts",
+      "entry": "src/modules/billing/billing-statement/index.ts",
       "requires": ["billing", "resource-pay"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/billing-statement"]
+      "ownedRoots": ["src/modules/billing/billing-statement"]
     },
     {
       "id": "operations-wecom-approval",
-      "entry": "src/modules/operations-wecom-approval/index.ts",
+      "entry": "src/modules/operations/operations-wecom-approval/index.ts",
       "requires": ["operations", "resource-wecom"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-wecom-approval"]
+      "ownedRoots": ["src/modules/operations/operations-wecom-approval"]
     },
     {
       "id": "operations-wecom-login",
-      "entry": "src/modules/operations-wecom-login/index.ts",
+      "entry": "src/modules/operations/operations-wecom-login/index.ts",
       "requires": ["operations", "resource-wecom"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-wecom-login"]
+      "ownedRoots": ["src/modules/operations/operations-wecom-login"]
     },
     {
       "id": "operations-wecom-password",
-      "entry": "src/modules/operations-wecom-password/index.ts",
+      "entry": "src/modules/operations/operations-wecom-password/index.ts",
       "requires": ["operations", "resource-wecom"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-wecom-password"]
+      "ownedRoots": ["src/modules/operations/operations-wecom-password"]
     },
     {
       "id": "operations-email-notify",
-      "entry": "src/modules/operations-email-notify/index.ts",
+      "entry": "src/modules/operations/operations-email-notify/index.ts",
       "requires": ["operations", "resource-smtp"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-email-notify"]
+      "ownedRoots": ["src/modules/operations/operations-email-notify"]
     },
     {
       "id": "account-email-bind",
-      "entry": "src/modules/account-email-bind/index.ts",
+      "entry": "src/modules/account/account-email-bind/index.ts",
       "requires": ["account", "resource-smtp"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-email-bind"]
+      "ownedRoots": ["src/modules/account/account-email-bind"]
     },
     {
       "id": "account-avatar",
-      "entry": "src/modules/account-avatar/index.ts",
+      "entry": "src/modules/account/account-avatar/index.ts",
       "requires": ["account", "resource-oss"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/account-avatar"]
+      "ownedRoots": ["src/modules/account/account-avatar"]
     },
     {
       "id": "media-image",
-      "entry": "src/modules/media-image/index.ts",
+      "entry": "src/modules/media/media-image/index.ts",
       "requires": ["media", "resource-oss"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/media-image"]
+      "ownedRoots": ["src/modules/media/media-image"]
     },
     {
       "id": "media-video",
-      "entry": "src/modules/media-video/index.ts",
+      "entry": "src/modules/media/media-video/index.ts",
       "requires": ["media", "resource-oss"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/media-video"]
+      "ownedRoots": ["src/modules/media/media-video"]
     },
     {
       "id": "media-export",
-      "entry": "src/modules/media-export/index.ts",
+      "entry": "src/modules/media/media-export/index.ts",
       "requires": ["media", "resource-oss"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/media-export"]
+      "ownedRoots": ["src/modules/media/media-export"]
     },
     {
       "id": "billing-invoice",
-      "entry": "src/modules/billing-invoice/index.ts",
+      "entry": "src/modules/billing/billing-invoice/index.ts",
       "requires": ["billing", "resource-oss"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/billing-invoice"]
+      "ownedRoots": ["src/modules/billing/billing-invoice"]
     },
     {
       "id": "operations-feedback",
-      "entry": "src/modules/operations-feedback/index.ts",
+      "entry": "src/modules/operations/operations-feedback/index.ts",
       "requires": ["operations", "resource-feishu"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-feedback"]
+      "ownedRoots": ["src/modules/operations/operations-feedback"]
     },
     {
       "id": "operations-ticket",
-      "entry": "src/modules/operations-ticket/index.ts",
+      "entry": "src/modules/operations/operations-ticket/index.ts",
       "requires": ["operations", "resource-feishu"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-ticket"]
+      "ownedRoots": ["src/modules/operations/operations-ticket"]
     },
     {
       "id": "operations-hermes-chat",
-      "entry": "src/modules/operations-hermes-chat/index.ts",
+      "entry": "src/modules/operations/operations-hermes-chat/index.ts",
       "requires": ["operations", "resource-feishu"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-hermes-chat"]
+      "ownedRoots": ["src/modules/operations/operations-hermes-chat"]
     },
     {
       "id": "operations-alert",
-      "entry": "src/modules/operations-alert/index.ts",
+      "entry": "src/modules/operations/operations-alert/index.ts",
       "requires": ["operations", "resource-feishu"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-alert"]
+      "ownedRoots": ["src/modules/operations/operations-alert"]
     },
     {
       "id": "operations-model",
-      "entry": "src/modules/operations-model/index.ts",
+      "entry": "src/modules/operations/operations-model/index.ts",
       "requires": ["operations", "resource-hermes"],
       "conflicts": [],
-      "ownedRoots": ["src/modules/operations-model"]
+      "ownedRoots": ["src/modules/operations/operations-model"]
     },
     {
       "id": "company",

@@ -115,12 +115,42 @@ npm run publish -- --target local-enterprise-b --release-id local-b-001
 | `src/composition/`           | 唯一模块汇总、冲突检测与显式生命周期                         |
 | `src/core/`                  | 工作台壳、404、权限交集与加载失败提示                        |
 | `src/shared/`                | 通用组件、表单、导览、请求状态与本地 Mock 传输机制           |
-| `src/modules/`               | 120 个独立 owner 的私有实现和资源                            |
+| `src/modules/`               | 按业务归类的 120 项独立能力及其私有实现和资源                |
 | `tests/architecture/`        | 结构、反向引用、真实构建、封包、目标与篡改用例               |
 | `tests/e2e/`                 | 封包后生产站点浏览器验收                                     |
 | `tests/console/`             | 控制台配置、快照、API 与浏览器完整打包验收                   |
 
-业务模块可以依赖自身实现、中立契约、通用组件和基础服务，不能导入其他业务模块实现。核心和共享层不能反向导入业务。完整业务注册表只能被 composition 消费。`order-export requires orders` 只表示安装依赖，其按钮仍通过 `OrderToolContext` 取得订单快照。
+源码只增加一层业务分组，同一业务的能力目录放在一起。基础模块使用 `base/`，其余能力沿用原目录名；报表、审计、主体和新手指引等单能力目录直接保留实现。共享 Mock 资源统一归入 `resources/`，各资源仍独立配置。
+
+```text
+src/modules/
+├── orders/
+│   ├── base/
+│   ├── order-create/
+│   ├── order-export/
+│   └── …
+├── approvals/
+│   ├── base/
+│   ├── approval-approve/
+│   ├── approval-approve-field-comment/
+│   └── …
+├── inventory/
+├── stocktakes/
+├── access/
+├── account/
+├── billing/
+├── media/
+├── operations/
+├── resources/
+├── reports/
+├── audit-log/
+├── company/
+└── onboarding/
+```
+
+业务分组只用于源码组织，能力 ID、企业白名单和依赖关系沿用原定义。目录表的 `entry` 与 `ownedRoots` 指向各能力的实际目录，例如 `orders/base/` 和 `orders/order-export/`，每项能力继续独立装配、授权和裁剪。
+
+业务模块可以依赖自身实现、中立契约、通用组件和基础服务，不能导入其他业务模块实现，即使同处一个业务文件夹。核心和共享层不能反向导入业务。完整业务注册表只能被 composition 消费。`order-export requires orders` 只表示安装依赖，其按钮仍通过 `OrderToolContext` 取得订单快照。
 
 模块入口仅描述能力。`activateModules` 按装配顺序显式启动，失败时回收已启动模块，清理按相反顺序执行且幂等；页面请求和导出 Worker 在组件卸载时取消或销毁。扩展为空时订单、库存、审批页面仍可独立运行。模块激活时注入各自的会话工作区，切换页面保留数据，刷新页面重置。审计模块通过中立事件总线订阅成功操作，卸载时取消订阅。
 

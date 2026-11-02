@@ -332,7 +332,7 @@ describe('actual graph guard and post-build gate', () => {
     project = fixture();
     append(
       project.root,
-      'src/modules/orders/OrdersPage.vue',
+      'src/modules/orders/base/OrdersPage.vue',
       '<style scoped>.style-one { color: #123456; }</style>\n<style>.style-two { color: #654321; }</style>',
     );
     const audit = await buildEnterprise(project.root, 'enterprise-b', 'production', 'vue-styles');

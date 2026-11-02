@@ -110,11 +110,11 @@ test('conflicting external edits preserve the draft until explicitly reloaded', 
 test('real source-boundary failure shows logs, no download, and permits a corrected retry', async ({
   page,
 }) => {
-  const source = resolve(root, 'src/modules/orders/api.ts');
+  const source = resolve(root, 'src/modules/orders/base/api.ts');
   const original = readFileSync(source);
   writeFileSync(
     source,
-    `${original.toString('utf8')}\nif (false) void import('../reports/api');\n`,
+    `${original.toString('utf8')}\nif (false) void import('../../reports/api');\n`,
   );
   try {
     await page.goto('/');

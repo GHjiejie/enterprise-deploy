@@ -65,11 +65,15 @@ flowchart TB
 | 应用装配     | `src/composition/`   | 消费唯一业务注册表、校验贡献、创建运行时及路由、按顺序激活模块               |
 | 核心壳       | `src/core/`          | 工作台布局、独立布局、权限判断、活动总线、404 和资源加载失败提示             |
 | 共享实现     | `src/shared/`        | 通用表单、弹窗、扩展点、导览、请求状态和本地 Mock 传输机制                   |
-| 业务能力     | `src/modules/<id>/`  | 各自拥有页面、操作、校验器、样式、资产、Worker 和服务实现                    |
+| 业务能力     | `src/modules/`       | 按业务归类，各能力独立拥有页面、操作、校验器、样式、资产、Worker 和服务实现  |
 | 构建与交付   | `build/`             | 完成策略、图守卫、审计、封包、预览和本地发布                                 |
 | 本地工具界面 | `build-console/src/` | 企业配置和构建任务交互，不进入客户站点                                       |
 
-模块可以使用自身文件、中立契约、核心服务和共享组件。**模块不能直接导入另一个模块的私有实现，即使两个模块都已启用且存在 `requires` 关系。** 核心及共享层也不能反向导入业务模块。
+业务源码采用一层分组：`orders`、`approvals`、`inventory`、`stocktakes`、`access`、`account`、`billing`、`media`、`operations` 各自收纳本业务能力。基础能力位于业务目录下的 `base/`，其他能力保留原名，例如 `src/modules/approvals/approval-approve/`。外部 Mock 资源位于 `resources/resource-*/`；`reports`、`audit-log`、`company` 和 `onboarding` 等单能力目录直接保留实现。
+
+分组目录仅用于组织源码，每项能力保留原 ID、依赖、贡献和生命周期。目录表将 `entry`、`ownedRoots` 定位到独立能力目录，例如 `src/modules/orders/base/` 与 `src/modules/orders/order-export/`。业务父目录不登记为基础能力的归属根，避免覆盖同业务内的其他能力。
+
+模块可以使用自身文件、中立契约、核心服务和共享组件。**模块不能直接导入另一个模块的私有实现，即使同处一个业务文件夹、两个模块都已启用且存在 `requires` 关系。** 核心及共享层也不能反向导入业务模块。
 
 唯一被批准汇总业务入口的来源是生成的 `virtual:enterprise-modules`，且只有 composition 可以消费它。业务模块通过中立工作区接口、扩展点上下文或依赖注入协作，避免宿主页面为了显示一个可选按钮而导入其实现。
 

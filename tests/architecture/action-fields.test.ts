@@ -11,18 +11,18 @@ import { parseForm } from '../../src/shared/form';
 import { useConfiguredForm } from '../../src/shared/useConfiguredForm';
 import { loadPolicy, selectModules } from '../../build/policy/manifest';
 import { PROJECT_ROOT } from '../../build/utils';
-import adjustQuantity from '../../src/modules/inventory-adjust-field-quantity';
-import adjustReason from '../../src/modules/inventory-adjust-field-reason';
-import source from '../../src/modules/inventory-transfer-field-source';
-import target from '../../src/modules/inventory-transfer-field-target';
-import quantity from '../../src/modules/inventory-transfer-field-quantity';
-import reason from '../../src/modules/inventory-transfer-field-reason';
-import initialComment from '../../src/modules/approval-approve-field-comment';
-import rejectionReason from '../../src/modules/approval-reject-field-reason';
-import reviewComment from '../../src/modules/approval-review-field-comment';
-import { approveApproval } from '../../src/modules/approval-approve/model';
-import { reviewApproval } from '../../src/modules/approval-review/model';
-import { submitApproval } from '../../src/modules/approval-submit/model';
+import adjustQuantity from '../../src/modules/inventory/inventory-adjust-field-quantity';
+import adjustReason from '../../src/modules/inventory/inventory-adjust-field-reason';
+import source from '../../src/modules/inventory/inventory-transfer-field-source';
+import target from '../../src/modules/inventory/inventory-transfer-field-target';
+import quantity from '../../src/modules/inventory/inventory-transfer-field-quantity';
+import reason from '../../src/modules/inventory/inventory-transfer-field-reason';
+import initialComment from '../../src/modules/approvals/approval-approve-field-comment';
+import rejectionReason from '../../src/modules/approvals/approval-reject-field-reason';
+import reviewComment from '../../src/modules/approvals/approval-review-field-comment';
+import { approveApproval } from '../../src/modules/approvals/approval-approve/model';
+import { reviewApproval } from '../../src/modules/approvals/approval-review/model';
+import { submitApproval } from '../../src/modules/approvals/approval-submit/model';
 
 const stock: readonly StockItem[] = [
   { id: 's', sku: 'A', name: '商品 A', warehouse: '上海', quantity: 10, reserved: 3, threshold: 5 },

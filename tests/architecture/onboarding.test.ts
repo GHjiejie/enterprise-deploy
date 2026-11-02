@@ -3,18 +3,18 @@ import { assembleModules } from '../../src/composition/assemble';
 import type { FeatureModule, MenuItem, Owned, Runtime } from '../../src/contracts/feature';
 import { collectGuideSteps } from '../../src/modules/onboarding/model';
 import { placeGuide } from '../../src/shared/guide/position';
-import orders from '../../src/modules/orders';
-import inventory from '../../src/modules/inventory';
-import approvals from '../../src/modules/approvals';
-import stocktakes from '../../src/modules/stocktakes';
+import orders from '../../src/modules/orders/base';
+import inventory from '../../src/modules/inventory/base';
+import approvals from '../../src/modules/approvals/base';
+import stocktakes from '../../src/modules/stocktakes/base';
 import reports from '../../src/modules/reports';
 import audit from '../../src/modules/audit-log';
-import create from '../../src/modules/order-create';
-import exportOrders from '../../src/modules/order-export';
-import complete from '../../src/modules/order-bulk-complete';
-import transfer from '../../src/modules/inventory-transfer';
-import submit from '../../src/modules/approval-submit';
-import createStocktake from '../../src/modules/stocktake-create';
+import create from '../../src/modules/orders/order-create';
+import exportOrders from '../../src/modules/orders/order-export';
+import complete from '../../src/modules/orders/order-bulk-complete';
+import transfer from '../../src/modules/inventory/inventory-transfer';
+import submit from '../../src/modules/approvals/approval-submit';
+import createStocktake from '../../src/modules/stocktakes/stocktake-create';
 import onboarding from '../../src/modules/onboarding';
 const modules = [
   orders,
